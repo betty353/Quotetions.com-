@@ -1,0 +1,508 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+  CUSTOMER
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  VIEWED
+  APPROVED
+  REJECTED
+  EXPIRED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  COMPLETED
+  OVERDUE
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_MONEY
+  CARD
+  CHEQUE
+  OTHER
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  RESCHEDULED
+  CANCELLED
+}
+
+enum NotificationType {
+  QUOTATION_CREATED
+  QUOTATION_APPROVED
+  PAYMENT_RECORDED
+  RECEIPT_GENERATED
+  EMPLOYEE_ASSIGNED
+  FOLLOWUP_REMINDER
+  SYSTEM_ALERT
+}
+
+// Users - for authentication
+model User {
+  id                    String    @id @default(cuid())
+  firebaseUid           String?   @unique
+  email                 String    @unique
+  password              String
+  firstName             String
+  lastName              String
+  phone                 String?
+  role                  UserRole  @default(CUSTOMER)
+  isActive              Boolean   @default(true)
+  isEmailVerified       Boolean   @default(false)
+  lastLogin             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  customer              Customer?
+  employee              Employee?
+  account               Account?
+  sessions              Session[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+  quotations            Quotation[] @relation("QuotationCreatedBy")
+  payments              Payment[] @relation("PaymentRecordedBy")
+  receipts              Receipt[] @relation("ReceiptGeneratedBy")
+  followUps             FollowUp[] @relation("FollowUpCreatedBy")
+  activityLogs          ActivityLog[]
+  productImportHistories ProductImportHistory[]
+
+  @@index([email])
+  @@index([role])
+}
+
+// NextAuth Account
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String  @unique
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// NextAuth Session
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Customers
+model Customer {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  companyName           String?
+  companyRegistration   String?
+  taxId                 String?
+  phone                 String
+  address               String?
+  city                  String?
+  region                String?
+  country               String?
+  postalCode            String?
+  contactPerson         String?
+  creditLimit           Decimal   @default(0) @db.Decimal(12, 2)
+  creditUsed            Decimal   @default(0) @db.Decimal(12, 2)
+  status                String    @default("ACTIVE") // ACTIVE, INACTIVE, SUSPENDED
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quotations            Quotation[]
+  payments              Payment[]
+  receipts              Receipt[]
+  followUps             FollowUp[]
+  notifications         Notification[]
+  activityLogs          ActivityLog[]
+
+  @@index([userId])
+  @@index([companyName])
+}
+
+// Employees
+model Employee {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  employeeId            String    @unique
+  department            String?
+  position              String?
+  phone                 String?
+  address               String?
+  hireDate              DateTime?
+  salary                Decimal?  @db.Decimal(12, 2)
+  performanceRating     Float?
+  quotaTarget           Decimal?  @db.Decimal(12, 2)
+  commissionRate        Float?
+  status                String    @default("ACTIVE") // ACTIVE, INACTIVE, ON_LEAVE
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quotations            Quotation[] @relation("AssignedEmployee")
+  followUps             FollowUp[]
+  activityLogs          ActivityLog[]
+
+  @@index([userId])
+  @@index([employeeId])
+}
+
+// Products
+model Product {
+  id                    String    @id @default(cuid())
+  sku                   String    @unique
+  name                  String
+  description           String?   @db.Text
+  categoryId            String
+  unitPrice             Decimal   @db.Decimal(12, 2)
+  currency              String    @default("USD")
+  stock                 Int       @default(0)
+  reorderLevel          Int?
+  image                 String?
+  status                String    @default("ACTIVE") // ACTIVE, INACTIVE, DISCONTINUED
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  category              Category  @relation(fields: [categoryId], references: [id])
+  quotationItems        QuotationItem[]
+
+  @@index([categoryId])
+  @@index([sku])
+  @@index([name])
+}
+
+// Product Categories
+model Category {
+  id                    String    @id @default(cuid())
+  name                  String    @unique
+  description           String?
+  icon                  String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  products              Product[]
+}
+
+model ProductImportHistory {
+  id                  String   @id @default(cuid())
+  importedById        String
+  source              String   @default("csv")
+  createdCount        Int      @default(0)
+  errorCount          Int      @default(0)
+  categoriesCreated   Json?
+  errors              Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  importedBy          User     @relation(fields: [importedById], references: [id], onDelete: Cascade)
+
+  @@index([importedById])
+  @@index([createdAt])
+}
+
+// Quotations
+model Quotation {
+  id                    String    @id @default(cuid())
+  quotationNumber       String    @unique
+  customerId            String
+  createdById           String
+  assignedEmployeeId    String?
+  status                QuotationStatus @default(DRAFT)
+  subtotal              Decimal   @db.Decimal(12, 2)
+  taxAmount             Decimal   @db.Decimal(12, 2)
+  discountAmount        Decimal   @db.Decimal(12, 2)
+  total                 Decimal   @db.Decimal(12, 2)
+  currency              String    @default("USD")
+  notes                 String?   @db.Text
+  terms                 String?   @db.Text
+  validUntil            DateTime?
+  viewedAt              DateTime?
+  approvedAt            DateTime?
+  rejectedAt            DateTime?
+  rejectionReason       String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  customer              Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdBy             User      @relation("QuotationCreatedBy", fields: [createdById], references: [id])
+  assignedEmployee      Employee? @relation("AssignedEmployee", fields: [assignedEmployeeId], references: [id])
+  items                 QuotationItem[]
+  payments              Payment[]
+  receipts              Receipt[]
+  followUps             FollowUp[]
+  notifications         Notification[]
+  activityLogs          ActivityLog[]
+
+  @@index([customerId])
+  @@index([createdById])
+  @@index([assignedEmployeeId])
+  @@index([status])
+  @@index([quotationNumber])
+}
+
+// Quotation Items
+model QuotationItem {
+  id                    String    @id @default(cuid())
+  quotationId           String
+  productId             String
+  quantity              Int
+  unitPrice             Decimal   @db.Decimal(12, 2)
+  discount              Decimal   @default(0) @db.Decimal(12, 2)
+  tax                   Decimal   @default(0) @db.Decimal(12, 2)
+  total                 Decimal   @db.Decimal(12, 2)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  quotation             Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product               Product   @relation(fields: [productId], references: [id])
+
+  @@index([quotationId])
+  @@index([productId])
+}
+
+// Payments
+model Payment {
+  id                    String    @id @default(cuid())
+  paymentNumber         String    @unique
+  quotationId           String
+  customerId            String
+  recordedById          String
+  method                PaymentMethod
+  amount                Decimal   @db.Decimal(12, 2)
+  currency              String    @default("USD")
+  status                PaymentStatus @default(PENDING)
+  reference             String?
+  notes                 String?   @db.Text
+  paymentDate           DateTime
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  quotation             Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  customer              Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  recordedBy            User      @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
+  notifications         Notification[]
+  activityLogs          ActivityLog[]
+
+  @@index([quotationId])
+  @@index([customerId])
+  @@index([recordedById])
+  @@index([status])
+}
+
+// Receipts
+model Receipt {
+  id                    String    @id @default(cuid())
+  receiptNumber         String    @unique
+  quotationId           String
+  customerId            String
+  generatedById         String
+  amount                Decimal   @db.Decimal(12, 2)
+  currency              String    @default("USD")
+  paymentMethod         PaymentMethod
+  reference             String?
+  notes                 String?   @db.Text
+  signatureImageUrl     String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  quotation             Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  customer              Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  generatedBy           User      @relation("ReceiptGeneratedBy", fields: [generatedById], references: [id])
+  notifications         Notification[]
+  activityLogs          ActivityLog[]
+
+  @@index([quotationId])
+  @@index([customerId])
+  @@index([generatedById])
+}
+
+// Follow-ups/CRM
+model FollowUp {
+  id                    String    @id @default(cuid())
+  quotationId           String
+  customerId            String
+  employeeId            String
+  createdById           String
+  status                FollowUpStatus @default(PENDING)
+  type                  String    // CALL, EMAIL, MEETING, NOTE
+  callNotes             String?   @db.Text
+  meetingNotes          String?   @db.Text
+  feedback              String?   @db.Text
+  nextFollowUpDate      DateTime?
+  reminderDate          DateTime?
+  reminderSent          Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  quotation             Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  customer              Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  employee              Employee  @relation(fields: [employeeId], references: [id])
+  createdBy             User      @relation("FollowUpCreatedBy", fields: [createdById], references: [id])
+  notifications         Notification[]
+  activityLogs          ActivityLog[]
+
+  @@index([quotationId])
+  @@index([customerId])
+  @@index([employeeId])
+  @@index([status])
+}
+
+// Notifications
+model Notification {
+  id                    String    @id @default(cuid())
+  userId                String
+  type                  NotificationType
+  title                 String
+  message               String    @db.Text
+  relatedId             String?   // quotationId, paymentId, etc.
+  relatedModel          String?   // Quotation, Payment, etc.
+  isRead                Boolean   @default(false)
+  readAt                DateTime?
+  createdAt             DateTime  @default(now())
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customer              Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  quotation             Quotation? @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  payment               Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  followUp              FollowUp? @relation(fields: [followUpId], references: [id], onDelete: SetNull)
+  receipt              Receipt?  @relation(fields: [receiptId], references: [id], onDelete: SetNull)
+
+  customerId            String?
+  quotationId           String?
+  paymentId             String?
+  followUpId            String?
+  receiptId             String?
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// Audit Logs
+model AuditLog {
+  id                    String    @id @default(cuid())
+  userId                String
+  action                String    // CREATE, UPDATE, DELETE, VIEW
+  entity                String    // Product, Quotation, Payment, etc.
+  entityId              String
+  changes               String?   @db.Text // JSON of what changed
+  ipAddress             String?
+  userAgent             String?
+  createdAt             DateTime  @default(now())
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([entity])
+  @@index([entityId])
+  @@index([createdAt])
+}
+
+// Activity Logs (timeline of customer interactions)
+model ActivityLog {
+  id                    String    @id @default(cuid())
+  customerId            String
+  userId                String?
+  employeeId            String?
+  activityType          String    // QUOTATION_CREATED, PAYMENT_RECEIVED, FOLLOWUP_SCHEDULED, etc.
+  description           String
+  details               String?   @db.Text // JSON
+  createdAt             DateTime  @default(now())
+
+  // Relations
+  customer              Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user                  User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  employee              Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  quotation             Quotation? @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  payment               Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  receipt               Receipt? @relation(fields: [receiptId], references: [id], onDelete: SetNull)
+  followUp              FollowUp? @relation(fields: [followUpId], references: [id], onDelete: SetNull)
+
+  quotationId           String?
+  paymentId             String?
+  receiptId             String?
+  followUpId            String?
+
+  @@index([customerId])
+  @@index([userId])
+  @@index([activityType])
+  @@index([createdAt])
+}
+
+// Company Settings
+model CompanySetting {
+  id                    String    @id @default(cuid())
+  companyName           String
+  companyEmail          String
+  companyPhone          String
+  companyAddress        String?
+  companyCity           String?
+  companyRegion         String?
+  companyCountry        String?
+  companyPostalCode     String?
+  companyTaxId          String?
+  companyRegistration   String?
+  defaultCurrency       String    @default("USD")
+  taxRate               Float     @default(0)
+  quotationPrefix       String    @default("QT")
+  receiptPrefix         String    @default("RC")
+  paymentPrefix         String    @default("PM")
+  quotationValidDays    Int       @default(30)
+  bankName              String?
+  bankAccount           String?
+  bankCode              String?
+  companyWebsite        String?
+  companyLogo           String?
+  signatureImageUrl     String?
+  documentFont          String    @default("Helvetica")
+  socialMedia           String?   @db.Text // JSON
+  businessHours         String?   @db.Text // JSON
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
