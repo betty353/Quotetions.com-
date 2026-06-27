@@ -1,5 +1,4 @@
 import Link from "next/link"
-import { notFound } from "next/navigation"
 import { getServerSession } from "next-auth"
 import { Search, ShoppingCart } from "lucide-react"
 import SafeImage from "@/components/ui/safe-image"
@@ -8,6 +7,20 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+
+function safeImageSrc(value?: string | null) {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith("/") || trimmed.startsWith("data:image/") || trimmed.startsWith("blob:")) return trimmed
+
+  try {
+    const url = new URL(trimmed)
+    return url.protocol === "http:" || url.protocol === "https:" ? trimmed : null
+  } catch {
+    return null
+  }
+}
 
 type StorePageProps = {
   params: Promise<{ companySlug: string }>
@@ -48,9 +61,22 @@ export default async function StorePage({ params, searchParams }: StorePageProps
     },
   })
 
-  if (!company || !company.isActive) notFound()
+  if (!company || !company.isActive) {
+    return (
+      <main className="min-h-screen bg-background">
+        <section className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center px-4 text-center">
+          <h1 className="text-3xl font-semibold tracking-tight">Store not found</h1>
+          <p className="mt-3 text-sm text-muted-foreground">This customer store link is not active. Ask the company to share the latest catalog link from Company Settings.</p>
+          <Link href="/" className="mt-6 inline-flex h-10 items-center justify-center rounded-lg border border-input bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-accent">
+            Go home
+          </Link>
+        </section>
+      </main>
+    )
+  }
 
   const currency = company.settings?.defaultCurrency || "ZMW"
+  const logoSrc = safeImageSrc(company.logoUrl || company.settings?.companyLogo)
   const isCustomer = session?.user?.role === "CUSTOMER"
   const customerCta = isCustomer
     ? `/dashboard/quotations/new?companySlug=${company.slug}`
@@ -62,8 +88,8 @@ export default async function StorePage({ params, searchParams }: StorePageProps
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-4">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border bg-card">
-              {company.logoUrl || company.settings?.companyLogo ? (
-                <SafeImage src={company.logoUrl || company.settings?.companyLogo || ""} alt={`${company.name} logo`} width={64} height={64} className="h-full w-full object-cover" />
+              {logoSrc ? (
+                <SafeImage src={logoSrc} alt={`${company.name} logo`} width={64} height={64} className="h-full w-full object-cover" />
               ) : (
                 <span className="text-xl font-semibold">{company.name.slice(0, 1)}</span>
               )}
@@ -111,33 +137,41 @@ export default async function StorePage({ params, searchParams }: StorePageProps
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {company.products.map((product) => (
-              <Card key={product.id} className="overflow-hidden">
-                {product.image && (
-                  <div className="aspect-[4/3] border-b bg-surface">
-                    <SafeImage src={product.image} alt={product.name} width={480} height={360} className="h-full w-full object-cover" />
-                  </div>
-                )}
-                <CardContent className="space-y-3 p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <Badge>{product.category.name}</Badge>
-                      <h2 className="mt-2 text-base font-semibold">{product.name}</h2>
-                    </div>
-                    <p className="text-sm font-semibold">{currency} {Number(product.unitPrice).toFixed(2)}</p>
-                  </div>
-                  {product.description && <p className="line-clamp-3 text-sm text-muted-foreground">{product.description}</p>}
-                  <Link
-                    href={customerCta}
-                    className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-input bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
-                  >
-                    Request quotation
-                  </Link>
-                </CardContent>
-              </Card>
+              <StoreProductCard key={product.id} product={product} currency={currency} customerCta={customerCta} />
             ))}
           </div>
         )}
       </section>
     </main>
+  )
+}
+
+function StoreProductCard({ product, currency, customerCta }: { product: any; currency: string; customerCta: string }) {
+  const productImage = safeImageSrc(product.image)
+
+  return (
+    <Card className="overflow-hidden">
+      {productImage && (
+        <div className="aspect-[4/3] border-b bg-surface">
+          <SafeImage src={productImage} alt={product.name} width={480} height={360} className="h-full w-full object-cover" />
+        </div>
+      )}
+      <CardContent className="space-y-3 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <Badge>{product.category?.name || "Catalog"}</Badge>
+            <h2 className="mt-2 text-base font-semibold">{product.name}</h2>
+          </div>
+          <p className="text-sm font-semibold">{currency} {Number(product.unitPrice).toFixed(2)}</p>
+        </div>
+        {product.description && <p className="line-clamp-3 text-sm text-muted-foreground">{product.description}</p>}
+        <Link
+          href={customerCta}
+          className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-input bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
+        >
+          Request quotation
+        </Link>
+      </CardContent>
+    </Card>
   )
 }
