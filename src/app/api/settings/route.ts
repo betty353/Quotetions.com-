@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import requireRole from "@/lib/roles"
 import { companySettingsSchema } from "@/lib/schemas"
@@ -67,8 +68,8 @@ export async function PUT(request: NextRequest) {
       signatureImageUrl: validated.signatureImageUrl || null,
     }
 
-    const setting = await prisma.$transaction(async (tx) => {
-      await tx.company.update({
+    const result = await prisma.$transaction(async (tx) => {
+      const company = await tx.company.update({
         where: { id: companyId },
         data: {
           name: validated.companyName,
@@ -86,14 +87,19 @@ export async function PUT(request: NextRequest) {
         },
       })
 
-      return tx.companySetting.upsert({
+      const setting = await tx.companySetting.upsert({
         where: { companyId },
         create: { ...settingData, companyId },
         update: settingData,
       })
+
+      return { company, setting }
     })
 
-    return NextResponse.json({ data: setting })
+    revalidatePath(`/store/${result.company.slug}`)
+    revalidatePath("/dashboard/settings")
+
+    return NextResponse.json({ data: result.setting })
   } catch (err: unknown) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: "Validation failed", details: err.errors }, { status: 400 })
