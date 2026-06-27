@@ -25,6 +25,7 @@ export default function DpoPayButton({
       const res = await fetch("/api/payments/dpo/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ quotationId }),
       })
       const data = await res.json()
@@ -43,6 +44,7 @@ export default function DpoPayButton({
       const res = await fetch("/api/payments/dpo/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ quotationId, transactionToken }),
       })
       const data = await res.json()

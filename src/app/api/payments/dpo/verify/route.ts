@@ -30,11 +30,14 @@ export async function POST(request: NextRequest) {
     if (!payment) return NextResponse.json({ error: "Payment not found" }, { status: 404 })
 
     const role = (session.user as any).role
+    const companyId = (session.user as any).companyId as string | null
     if (role === "CUSTOMER") {
       const customer = await prisma.customer.findUnique({ where: { userId: session.user.id } })
       if (!customer || customer.id !== payment.customerId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
       }
+    } else if (companyId !== payment.companyId && companyId !== payment.quotation.companyId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
     const result = await verifyAndRecordDpoPayment(token)

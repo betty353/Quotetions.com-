@@ -2,13 +2,30 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verifyAndRecordDpoPayment } from "@/lib/dpo-payments"
 
-function getToken(request: NextRequest) {
+async function getToken(request: NextRequest) {
   const params = request.nextUrl.searchParams
-  return params.get("TransactionToken") || params.get("TransToken") || params.get("token") || params.get("ID")
+  const queryToken = params.get("TransactionToken") || params.get("TransToken") || params.get("token") || params.get("ID")
+  if (queryToken) return queryToken
+
+  try {
+    const contentType = request.headers.get("content-type") || ""
+    if (contentType.includes("application/json")) {
+      const body = await request.json()
+      return body.TransactionToken || body.TransToken || body.token || body.ID || null
+    }
+    if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+      const form = await request.formData()
+      return String(form.get("TransactionToken") || form.get("TransToken") || form.get("token") || form.get("ID") || "") || null
+    }
+  } catch {
+    return null
+  }
+
+  return null
 }
 
 export async function GET(request: NextRequest) {
-  const token = getToken(request)
+  const token = await getToken(request)
   if (!token) {
     return NextResponse.json({ error: "Missing DPO transaction token" }, { status: 400 })
   }
@@ -35,4 +52,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(`${origin}/dashboard?payment=failed`)
   }
+}
+
+export async function POST(request: NextRequest) {
+  return GET(request)
 }

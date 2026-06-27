@@ -18,11 +18,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { quotationId } = createDpoPaymentSchema.parse(body)
 
-    const setting = await prisma.companySetting.findFirst()
-    if (!setting?.paymentSetupComplete || !setting.paymentEnabled) {
-      return NextResponse.json({ error: "Payment setup is not complete" }, { status: 400 })
-    }
-
     const quotation = await prisma.quotation.findUnique({
       where: { id: quotationId },
       include: {
@@ -30,13 +25,22 @@ export async function POST(request: NextRequest) {
       },
     })
     if (!quotation) return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
+    if (!quotation.companyId) return NextResponse.json({ error: "Quotation company is missing" }, { status: 400 })
 
     const role = (session.user as any).role
+    const sessionCompanyId = (session.user as any).companyId as string | null
     if (role === "CUSTOMER") {
       const customer = await prisma.customer.findUnique({ where: { userId: session.user.id } })
       if (!customer || customer.id !== quotation.customerId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
       }
+    } else if (sessionCompanyId !== quotation.companyId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+    }
+
+    const setting = await prisma.companySetting.findUnique({ where: { companyId: quotation.companyId } })
+    if (!setting?.paymentSetupComplete || !setting.paymentEnabled) {
+      return NextResponse.json({ error: "Payment setup is not complete" }, { status: 400 })
     }
 
     if (quotation.paymentStatus === "COMPLETED" || quotation.status === "COMPLETED") {
@@ -57,7 +61,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         data: {
           transactionToken: existingPayment.dpoTransactionToken,
-          redirectUrl: getDpoPaymentUrl(existingPayment.dpoTransactionToken),
+          redirectUrl: getDpoPaymentUrl(existingPayment.dpoTransactionToken, setting.dpoEnvironment),
         },
       })
     }
@@ -78,6 +82,7 @@ export async function POST(request: NextRequest) {
       backUrl: returnUrl,
       companyToken,
       serviceType,
+      environment: setting.dpoEnvironment,
     })
 
     const count = await prisma.payment.count()
@@ -85,6 +90,7 @@ export async function POST(request: NextRequest) {
 
     await prisma.payment.create({
       data: {
+        companyId: quotation.companyId,
         paymentNumber,
         quotationId: quotation.id,
         customerId: quotation.customerId,

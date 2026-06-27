@@ -21,6 +21,8 @@ export default async function PaymentsPage() {
     where.customerId = customer.id
   } else if (companyId) {
     where.companyId = companyId
+  } else {
+    redirect("/dashboard")
   }
 
   const payments = await prisma.payment.findMany({

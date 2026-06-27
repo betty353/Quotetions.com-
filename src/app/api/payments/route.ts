@@ -10,12 +10,17 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const role = (session.user as any).role
+  const companyId = (session.user as any).companyId as string | null
   const where: any = {}
 
   if (role === "CUSTOMER") {
     const customer = await prisma.customer.findUnique({ where: { userId: session.user.id } })
     if (!customer) return NextResponse.json({ error: "Customer profile not found" }, { status: 404 })
     where.customerId = customer.id
+  } else if (companyId) {
+    where.companyId = companyId
+  } else {
+    return NextResponse.json({ error: "Company workspace required" }, { status: 400 })
   }
 
   const payments = await prisma.payment.findMany({
@@ -34,6 +39,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await requireRole("ADMIN", "EMPLOYEE")
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const companyId = (session.user as any).companyId as string | null
+  if (!companyId) return NextResponse.json({ error: "Company workspace required" }, { status: 400 })
 
   try {
     const body = await request.json()
@@ -51,6 +58,9 @@ export async function POST(request: NextRequest) {
       },
     })
     if (!quotation) return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
+    if (quotation.companyId !== companyId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+    }
 
     const existingPaid = quotation.payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
     const outstanding = Math.max(0, Number(quotation.total) - existingPaid)
@@ -71,6 +81,7 @@ export async function POST(request: NextRequest) {
 
     const payment = await prisma.payment.create({
       data: {
+        companyId,
         paymentNumber,
         quotationId: validated.quotationId,
         customerId: quotation.customerId,
@@ -101,6 +112,7 @@ export async function POST(request: NextRequest) {
       },
     })
     await createActivityLog({
+      companyId,
       customerId: quotation.customerId,
       userId: session.user.id,
       activityType: "PAYMENT_RECORDED",
@@ -115,6 +127,7 @@ export async function POST(request: NextRequest) {
       paymentId: payment.id,
     })
     await createAuditLog({
+      companyId,
       userId: session.user.id,
       action: "CREATE",
       entity: "Payment",

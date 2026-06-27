@@ -15,6 +15,7 @@ type CreateTokenInput = {
   backUrl: string
   companyToken: string
   serviceType: string
+  environment: "SANDBOX" | "PRODUCTION"
 }
 
 export type DpoVerifyResult = {
@@ -27,8 +28,12 @@ export type DpoVerifyResult = {
   paymentReference?: string
 }
 
-function getApiUrl() {
-  return process.env.DPO_API_URL || "https://secure.3gdirectpay.com/API/v6/"
+function getApiUrl(environment: "SANDBOX" | "PRODUCTION" = "PRODUCTION") {
+  if (process.env.DPO_API_URL) return process.env.DPO_API_URL
+  if (environment === "SANDBOX") {
+    return process.env.DPO_SANDBOX_API_URL || "https://secure1.sandbox.directpay.online/API/v6/"
+  }
+  return process.env.DPO_PRODUCTION_API_URL || "https://secure.3gdirectpay.com/API/v6/"
 }
 
 function escapeXml(value: string | number) {
@@ -45,8 +50,8 @@ function tagValue(xml: string, tag: string) {
   return match?.[1]?.trim()
 }
 
-async function postDpoXml(xml: string) {
-  const response = await fetch(getApiUrl(), {
+async function postDpoXml(xml: string, environment: "SANDBOX" | "PRODUCTION" = "PRODUCTION") {
+  const response = await fetch(getApiUrl(environment), {
     method: "POST",
     headers: {
       "Content-Type": "application/xml",
@@ -74,8 +79,8 @@ export function getDpoCredentials(setting: DpoSetting) {
   }
 }
 
-export function getDpoPaymentUrl(transactionToken: string) {
-  const configured = getApiUrl()
+export function getDpoPaymentUrl(transactionToken: string, environment: "SANDBOX" | "PRODUCTION" = "PRODUCTION") {
+  const configured = getApiUrl(environment)
   const url = new URL(configured)
   return `${url.origin}/payv2.php?ID=${encodeURIComponent(transactionToken)}`
 }
@@ -104,7 +109,7 @@ export async function createDpoToken(input: CreateTokenInput) {
   </Services>
 </API3G>`
 
-  const responseXml = await postDpoXml(xml)
+  const responseXml = await postDpoXml(xml, input.environment)
   const result = tagValue(responseXml, "Result") || ""
   const resultExplanation = tagValue(responseXml, "ResultExplanation") || ""
   const transactionToken = tagValue(responseXml, "TransToken")
@@ -117,13 +122,13 @@ export async function createDpoToken(input: CreateTokenInput) {
   return {
     transactionToken,
     transactionReference,
-    paymentUrl: getDpoPaymentUrl(transactionToken),
+    paymentUrl: getDpoPaymentUrl(transactionToken, input.environment),
     result,
     resultExplanation,
   }
 }
 
-export async function verifyDpoToken(companyToken: string, transactionToken: string): Promise<DpoVerifyResult> {
+export async function verifyDpoToken(companyToken: string, transactionToken: string, environment: "SANDBOX" | "PRODUCTION" = "PRODUCTION"): Promise<DpoVerifyResult> {
   const xml = `<?xml version="1.0" encoding="utf-8"?>
 <API3G>
   <CompanyToken>${escapeXml(companyToken)}</CompanyToken>
@@ -131,7 +136,7 @@ export async function verifyDpoToken(companyToken: string, transactionToken: str
   <TransactionToken>${escapeXml(transactionToken)}</TransactionToken>
 </API3G>`
 
-  const responseXml = await postDpoXml(xml)
+  const responseXml = await postDpoXml(xml, environment)
   return {
     result: tagValue(responseXml, "Result") || "",
     resultExplanation: tagValue(responseXml, "ResultExplanation") || "",

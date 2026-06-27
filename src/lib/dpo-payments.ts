@@ -16,7 +16,7 @@ function toPaymentMethod(value?: string | null) {
   return "OTHER"
 }
 
-async function generateReceiptNumber(tx: Prisma.TransactionClient) {
+async function generateReceiptNumber(tx: Prisma.TransactionClient, prefix = "RCT") {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "")
   const dayStart = new Date()
   dayStart.setHours(0, 0, 0, 0)
@@ -30,19 +30,10 @@ async function generateReceiptNumber(tx: Prisma.TransactionClient) {
       },
     },
   })
-  return `RCT-${datePart}-${String(count + 1).padStart(6, "0")}`
+  return `${prefix}-${datePart}-${String(count + 1).padStart(6, "0")}`
 }
 
 export async function verifyAndRecordDpoPayment(transactionToken: string) {
-  const setting = await prisma.companySetting.findFirst()
-  if (!setting || !setting.paymentSetupComplete || !setting.paymentEnabled) {
-    throw new Error("Payment setup is not complete")
-  }
-
-  const { companyToken } = getDpoCredentials(setting)
-  const result = await verifyDpoToken(companyToken, transactionToken)
-  const successful = isDpoPaymentSuccessful(result)
-
   const payment = await prisma.payment.findUnique({
     where: { dpoTransactionToken: transactionToken },
     include: {
@@ -54,6 +45,20 @@ export async function verifyAndRecordDpoPayment(transactionToken: string) {
   if (!payment) {
     throw new Error("DPO payment transaction was not found")
   }
+
+  const companyId = payment.companyId || payment.quotation.companyId
+  if (!companyId) {
+    throw new Error("Payment company is missing")
+  }
+
+  const setting = await prisma.companySetting.findUnique({ where: { companyId } })
+  if (!setting || !setting.paymentSetupComplete || !setting.paymentEnabled) {
+    throw new Error("Payment setup is not complete")
+  }
+
+  const { companyToken } = getDpoCredentials(setting)
+  const result = await verifyDpoToken(companyToken, transactionToken, setting.dpoEnvironment)
+  const successful = isDpoPaymentSuccessful(result)
 
   const amountFromDpo = Number(result.transactionAmount || payment.amount)
   const expectedAmount = Number(payment.quotation.total)
@@ -108,7 +113,7 @@ export async function verifyAndRecordDpoPayment(transactionToken: string) {
       },
     })
 
-    const receiptNumber = existingReceipt?.receiptNumber || await generateReceiptNumber(tx)
+    const receiptNumber = existingReceipt?.receiptNumber || await generateReceiptNumber(tx, setting.receiptPrefix || "RCT")
 
     const paidPayment = await tx.payment.update({
       where: { id: payment.id },
@@ -138,6 +143,7 @@ export async function verifyAndRecordDpoPayment(transactionToken: string) {
 
     const receipt = existingReceipt || await tx.receipt.create({
       data: {
+        companyId,
         receiptNumber,
         quotationId: payment.quotationId,
         customerId: payment.customerId,
@@ -149,6 +155,7 @@ export async function verifyAndRecordDpoPayment(transactionToken: string) {
         reference,
         notes: "DPO payment verified and receipt generated",
         provider: "DPO",
+        signatureImageUrl: setting.signatureImageUrl || null,
       },
     })
 

@@ -46,6 +46,7 @@ export default function PaymentForm({ quotationId, customerId, quotationTotal }:
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(values),
       })
       const data: ApiResponse = await res.json()

@@ -107,6 +107,7 @@ export default function PaymentSetupForm({ setup }: { setup: PaymentSetup | null
     const res = await fetch("/api/payment-setup", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({
         ...form,
         mobileMoneyNetwork: form.settlementMethod === "BANK_ACCOUNT" ? "" : form.settlementMethod,
@@ -128,7 +129,7 @@ export default function PaymentSetupForm({ setup }: { setup: PaymentSetup | null
       setTesting(false)
       return
     }
-    const res = await fetch("/api/payment-setup/test", { method: "POST" })
+    const res = await fetch("/api/payment-setup/test", { method: "POST", credentials: "include" })
     const data = await res.json()
     const message = res.ok ? `DPO reached: ${data.data?.message || "Connected"}` : data.error || "DPO connection failed"
     setLastTestResult(message)
