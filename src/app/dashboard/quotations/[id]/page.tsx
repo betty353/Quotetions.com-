@@ -13,6 +13,7 @@ import QuotationStatusForm from "@/components/quotations/QuotationStatusForm"
 import DownloadQuotationPdf from "@/components/quotations/DownloadQuotationPdf"
 import DownloadReceiptPdf from "@/components/quotations/DownloadReceiptPdf"
 import ReconcileButton from "@/components/payments/ReconcileButton"
+import DpoPayButton from "@/components/payments/DpoPayButton"
 
 interface QuotationPageProps {
   params: Promise<{ id: string }>
@@ -52,6 +53,21 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
     orderBy: { employeeId: "asc" },
     include: { user: true },
   })
+  const paymentSetup = await prisma.companySetting.findFirst({
+    select: {
+      paymentSetupComplete: true,
+      paymentEnabled: true,
+    },
+  })
+  const canUseOnlinePayments = Boolean(paymentSetup?.paymentSetupComplete && paymentSetup.paymentEnabled)
+  const isPaid = quotation.paymentStatus === "COMPLETED" || quotation.status === "COMPLETED"
+  const paidReceipt = quotation.receipts.find((receipt) => receipt.receiptNumber === quotation.receiptNumber) || quotation.receipts[0]
+  const confirmedPaid = quotation.payments
+    .filter((payment) => payment.status === "PARTIAL" || payment.status === "COMPLETED")
+    .reduce((sum, payment) => sum + Number(payment.amount), 0)
+  const receipted = quotation.receipts.reduce((sum, receipt) => sum + Number(receipt.amount), 0)
+  const outstanding = Math.max(0, Number(quotation.total) - confirmedPaid)
+  const receiptable = Math.max(0, confirmedPaid - receipted)
 
   return (
     <div className="space-y-6">
@@ -70,6 +86,12 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs uppercase text-slate-500">Total</p>
             <p className="mt-2 text-xl font-semibold">{formatCurrency(quotation.total)}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs uppercase text-slate-500">Payment</p>
+            <Badge className="mt-2" variant={isPaid ? "success" : quotation.paymentStatus === "FAILED" || quotation.paymentStatus === "CANCELLED" ? "destructive" : "default"}>
+              {isPaid ? "PAID" : quotation.paymentStatus}
+            </Badge>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs uppercase text-slate-500">Customer</p>
@@ -153,10 +175,50 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
             <Card>
               <CardHeader>
                 <CardTitle>Payments</CardTitle>
-                <CardDescription>Record payment receipts against this quotation.</CardDescription>
+                <CardDescription>Pay online through DPO or record staff-confirmed payments.</CardDescription>
               </CardHeader>
               <CardContent>
-                <PaymentForm quotationId={quotation.id} quotationTotal={Number(quotation.total)} customerId={quotation.customerId} />
+                {!isPaid && (
+                  <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm text-slate-700">
+                      DPO processes the real money and settles funds to your registered merchant bank/mobile money account. This system only records and verifies payment status.
+                    </p>
+                    <div className="mt-4">
+                      <DpoPayButton
+                        quotationId={quotation.id}
+                        disabled={!canUseOnlinePayments}
+                        transactionToken={quotation.dpoTransactionToken}
+                      />
+                    </div>
+                    {!canUseOnlinePayments && (
+                      <p className="mt-2 text-sm text-amber-700">Online payments are not available until the administrator completes Payment Setup.</p>
+                    )}
+                  </div>
+                )}
+
+                {isPaid && paidReceipt && (
+                  <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4">
+                    <p className="font-semibold text-green-800">Payment verified</p>
+                    <div className="mt-3 grid gap-2 text-sm text-green-900 sm:grid-cols-2">
+                      <p>Receipt number: {paidReceipt.receiptNumber}</p>
+                      <p>Amount: {formatCurrency(paidReceipt.amount, paidReceipt.currency)}</p>
+                      <p>Method: {paidReceipt.paymentMethod}</p>
+                      <p>Reference: {paidReceipt.reference || quotation.paymentReference || "-"}</p>
+                      <p>Paid date: {quotation.paidAt ? formatDateTime(quotation.paidAt) : formatDateTime(paidReceipt.createdAt)}</p>
+                    </div>
+                    <div className="mt-4">
+                      <DownloadReceiptPdf receiptId={paidReceipt.id} />
+                    </div>
+                  </div>
+                )}
+
+                {role !== "CUSTOMER" && (
+                  outstanding > 0 ? (
+                    <PaymentForm quotationId={quotation.id} quotationTotal={outstanding} customerId={quotation.customerId} />
+                  ) : (
+                    <p className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">This quotation has no outstanding balance.</p>
+                  )
+                )}
                 {quotation.payments.length > 0 ? (
                   <div className="mt-6 overflow-x-auto">
                     <table className="min-w-full text-left text-sm">
@@ -164,8 +226,11 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
                         <tr>
                           <th className="px-4 py-3">Receipt#</th>
                           <th className="px-4 py-3">Amount</th>
+                          <th className="px-4 py-3">Provider</th>
+                          <th className="px-4 py-3">Reference</th>
                           <th className="px-4 py-3">Status</th>
                           <th className="px-4 py-3">Date</th>
+                          {role !== "CUSTOMER" && <th className="px-4 py-3">Action</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -173,11 +238,15 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
                           <tr key={payment.id} className="border-b border-slate-100 hover:bg-slate-50">
                             <td className="px-4 py-3">{payment.paymentNumber}</td>
                             <td className="px-4 py-3">{formatCurrency(payment.amount)}</td>
+                            <td className="px-4 py-3">{payment.provider}</td>
+                            <td className="px-4 py-3">{payment.reference || "-"}</td>
                             <td className="px-4 py-3">{payment.status}</td>
                             <td className="px-4 py-3">{formatDate(payment.paymentDate)}</td>
-                            <td className="px-4 py-3">
-                              <ReconcileButton paymentId={payment.id} />
-                            </td>
+                            {role !== "CUSTOMER" && (
+                              <td className="px-4 py-3">
+                                <ReconcileButton paymentId={payment.id} />
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -195,7 +264,13 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
                 <CardDescription>Generate receipts for confirmed payments.</CardDescription>
               </CardHeader>
               <CardContent>
-                <ReceiptForm quotationId={quotation.id} quotationTotal={Number(quotation.total)} customerId={quotation.customerId} />
+                {role !== "CUSTOMER" && (
+                  receiptable > 0 ? (
+                    <ReceiptForm quotationId={quotation.id} quotationTotal={receiptable} customerId={quotation.customerId} />
+                  ) : (
+                    <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">No confirmed unreceipted payment is available.</p>
+                  )
+                )}
                 {quotation.receipts.length > 0 ? (
                   <div className="mt-6 overflow-x-auto">
                     <table className="min-w-full text-left text-sm">

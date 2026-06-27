@@ -1,166 +1,260 @@
 "use client"
 
-import React from "react"
+import React, { useMemo, useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { signOut, useSession } from "next-auth/react"
 import {
+  Activity,
   BarChart3,
-  Package,
-  Users,
-  FileText,
-  CreditCard,
-  Receipt,
-  Settings,
-  LogOut,
-  User,
   Bell,
-  Search,
+  BellRing,
+  Building2,
+  CalendarCheck,
+  ChevronDown,
+  ChevronsLeft,
+  ChevronsRight,
+  CircleHelp,
+  CreditCard,
+  FileText,
+  Landmark,
+  LifeBuoy,
+  LogOut,
   Menu,
+  Moon,
+  Package,
+  PackageSearch,
+  Plus,
+  Receipt,
+  Search,
+  Settings,
+  ShoppingCart,
+  Sun,
+  Truck,
+  UserCog,
+  Users,
+  WalletCards,
   X,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { useState } from "react"
+import { useTheme } from "@/components/providers/ThemeProvider"
 
 const sidebarItems = [
-  { icon: BarChart3, label: "Dashboard", href: "/dashboard", allowedRoles: ["ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: FileText, label: "Quotations", href: "/dashboard/quotations", allowedRoles: ["ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: Users, label: "Customers", href: "/dashboard/customers", allowedRoles: ["ADMIN", "EMPLOYEE"] },
-  { icon: Package, label: "Products", href: "/dashboard/products", allowedRoles: ["ADMIN"] },
-  { icon: Package, label: "Import History", href: "/dashboard/products/import-history", allowedRoles: ["ADMIN"] },
-  { icon: Settings, label: "Settings", href: "/dashboard/settings", allowedRoles: ["ADMIN"] },
+  { icon: BarChart3, label: "Dashboard", href: "/dashboard", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: Users, label: "Customers", href: "/dashboard/customers", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
+  { icon: Package, label: "Products & Services", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: FileText, label: "Quotations", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: ShoppingCart, label: "Orders", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: WalletCards, label: "Invoices", href: "/dashboard/receipts", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: Receipt, label: "Receipts", href: "/dashboard/receipts", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: CreditCard, label: "Payments", href: "/dashboard/payments", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: BarChart3, label: "Reports", href: "/dashboard/reports", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
+  { icon: PackageSearch, label: "Inventory", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: Truck, label: "Suppliers", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: Building2, label: "Company Profile", href: "/dashboard/settings", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: UserCog, label: "Users", href: "/dashboard/employees", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: Landmark, label: "Payment Setup", href: "/dashboard/payment-setup", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: Settings, label: "Integrations", href: "/dashboard/payment-setup", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: Settings, label: "Settings", href: "/dashboard/settings", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: Activity, label: "Activity Logs", href: "/dashboard/notifications", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: LifeBuoy, label: "Support", href: "/dashboard/notifications", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: CalendarCheck, label: "Follow-Ups", href: "/dashboard/followups", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: Landmark, label: "Reconciliation", href: "/dashboard/reconciliation", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
+  { icon: BellRing, label: "Notifications", href: "/dashboard/notifications", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
 ]
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const router = useRouter()
   const { data: session } = useSession()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const { resolvedTheme, toggleTheme } = useTheme()
+  const [collapsed, setCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [navSearch, setNavSearch] = useState("")
 
   const userRole = (session?.user as any)?.role
+  const initials = session?.user?.name?.charAt(0) || session?.user?.email?.charAt(0) || "Q"
+  const activeItem = sidebarItems.find((item) => pathname === item.href || pathname.startsWith(item.href + "/"))
 
-  const filteredSidebarItems = sidebarItems.filter((item) =>
-    item.allowedRoles.includes(userRole)
-  )
+  const filteredSidebarItems = useMemo(() => {
+    return sidebarItems
+      .filter((item) => item.allowedRoles.includes(userRole))
+      .filter((item) => item.label.toLowerCase().includes(navSearch.toLowerCase()))
+  }, [navSearch, userRole])
 
   const handleLogout = async () => {
     await signOut({ redirect: true, callbackUrl: "/auth/login" })
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Mobile Sidebar Toggle */}
-      <div className="fixed top-0 left-0 right-0 z-40 bg-white border-b border-border lg:hidden">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center text-sm font-bold">
-              QC
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-card/95 backdrop-blur lg:hidden">
+        <div className="flex h-16 items-center justify-between px-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <Image src="/logo.jpg" alt="Quotetion logo" width={32} height={32} className="h-8 w-8 rounded-lg object-contain" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">Quotetion</p>
+              <p className="truncate text-xs text-muted-foreground">CRM Workspace</p>
             </div>
-            <span className="font-bold text-gray-900">Quotely</span>
           </div>
           <button
+            type="button"
+            aria-label="Toggle navigation"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden"
+            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </div>
 
-      {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:sticky left-0 top-0 h-screen w-64 bg-slate-900 text-white pt-6 z-30 overflow-y-auto transition-transform duration-300 lg:translate-x-0",
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          "fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-border bg-sidebar text-sidebar-foreground transition-all duration-200 lg:translate-x-0",
+          collapsed ? "lg:w-20" : "lg:w-[280px]",
+          mobileMenuOpen ? "w-[280px] translate-x-0" : "w-[280px] -translate-x-full"
         )}
       >
-        {/* Logo */}
-        <div className="px-6 mb-8 hidden lg:flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-600 text-white flex items-center justify-center font-bold text-lg">
-            QC
-          </div>
-          <div>
-            <h1 className="font-bold text-lg">Quotely</h1>
-            <p className="text-xs text-slate-400">CRM Platform</p>
-          </div>
+        <div className="flex h-16 items-center gap-3 border-b border-border px-4">
+          <Image src="/logo.jpg" alt="Quotetion logo" width={36} height={36} className="h-9 w-9 rounded-xl object-contain" />
+          {!collapsed && (
+            <button className="flex min-w-0 flex-1 items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent">
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold">Quotetion</span>
+                <span className="block truncate text-xs text-muted-foreground">Main workspace</span>
+              </span>
+              <ChevronDown size={16} className="text-muted-foreground" />
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => setCollapsed((value) => !value)}
+            className="hidden rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:inline-flex"
+          >
+            {collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
+          </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="px-4 space-y-1">
-          {filteredSidebarItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-blue-600 text-white"
-                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                )}
-              >
-                <item.icon size={20} />
-                <span>{item.label}</span>
-              </Link>
-            )
-          })}
+        {!collapsed && (
+          <div className="px-4 py-3">
+            <div className="flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3">
+              <Search size={16} className="text-muted-foreground" />
+              <input
+                value={navSearch}
+                onChange={(event) => setNavSearch(event.target.value)}
+                placeholder="Search pages"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+          </div>
+        )}
+
+        <nav className="flex-1 overflow-y-auto px-3 pb-4">
+          <div className="space-y-1">
+            {filteredSidebarItems.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+              return (
+                <Link
+                  key={`${item.label}-${item.href}`}
+                  href={item.href}
+                  title={collapsed ? item.label : undefined}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "group flex h-10 items-center rounded-xl px-3 text-sm font-medium transition-all duration-150",
+                    collapsed ? "justify-center gap-0" : "gap-3",
+                    isActive
+                      ? "bg-surface-selected text-foreground shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  )}
+                >
+                  <item.icon size={20} strokeWidth={1.8} className="shrink-0" />
+                  {!collapsed && <span className="truncate">{item.label}</span>}
+                </Link>
+              )
+            })}
+          </div>
         </nav>
 
-        {/* User Section */}
-        <div className="absolute bottom-0 left-0 right-0 border-t border-slate-700 p-4 space-y-3">
-          <div className="px-4 py-3 rounded-lg bg-slate-800">
-            <p className="text-xs text-slate-400">Logged in as</p>
-            <p className="text-sm font-medium text-white truncate">
-              {session?.user?.email}
-            </p>
+        <div className="border-t border-border p-3">
+          <div className={cn("rounded-xl border border-border bg-card p-3", collapsed && "p-2")}>
+            <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                {initials.toUpperCase()}
+              </div>
+              {!collapsed && (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{session?.user?.name || "Workspace user"}</p>
+                  <p className="truncate text-xs text-muted-foreground">{session?.user?.email}</p>
+                </div>
+              )}
+            </div>
+            {!collapsed && (
+              <button
+                onClick={handleLogout}
+                className="mt-3 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <LogOut size={16} />
+                <span>Logout</span>
+              </button>
+            )}
           </div>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-          >
-            <LogOut size={18} />
-            <span>Logout</span>
-          </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden pt-16 lg:pt-0">
-        {/* Top Bar */}
-        <header className="fixed lg:sticky top-0 right-0 left-0 lg:left-64 z-20 bg-white border-b border-border h-16 flex items-center px-6 gap-4">
-          <div className="flex-1 flex items-center gap-2 bg-slate-100 rounded-lg px-4 py-2">
-            <Search size={18} className="text-slate-500" />
-            <input
-              type="text"
-              placeholder="Search..."
-              className="flex-1 bg-transparent outline-none text-sm text-slate-700 placeholder-slate-500"
-            />
-          </div>
+      <div className={cn("min-h-screen pt-16 transition-[padding] duration-200 lg:pt-0", collapsed ? "lg:pl-20" : "lg:pl-[280px]")}>
+        <header className={cn("sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/80", "lg:h-16")}>
+          <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
+            <div className="hidden min-w-0 flex-col lg:flex">
+              <p className="truncate text-sm font-semibold">{activeItem?.label || "Dashboard"}</p>
+              <p className="truncate text-xs text-muted-foreground">Enterprise quotation workspace</p>
+            </div>
 
-          <div className="flex items-center gap-4">
-            {/* Notifications */}
-            <button className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-              <Bell size={20} />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 shadow-[0_1px_1px_rgba(15,23,42,0.02)]">
+              <Search size={18} className="text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search customers, quotations, payments..."
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              />
+              <kbd className="hidden rounded-md border border-border bg-surface px-1.5 py-0.5 text-[11px] text-muted-foreground sm:inline-flex">⌘K</kbd>
+            </div>
 
-            {/* User Profile */}
-            <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center text-sm font-bold">
-                {session?.user?.name?.charAt(0)}
-              </div>
-            </button>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard/quotations/new"
+                className="hidden h-10 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-all duration-200 hover:-translate-y-px hover:bg-primary/90 sm:inline-flex"
+              >
+                <Plus size={18} />
+                <span>New</span>
+              </Link>
+              <button type="button" aria-label="Help" className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                <CircleHelp size={20} />
+              </button>
+              <button
+                type="button"
+                aria-label="Toggle theme"
+                onClick={toggleTheme}
+                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                {resolvedTheme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+              <Link href="/dashboard/notifications" aria-label="Notifications" className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                <Bell size={20} />
+                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />
+              </Link>
+              <button className="hidden items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent sm:flex">
+                <Building2 size={18} />
+                <span className="max-w-24 truncate">Company</span>
+                <ChevronDown size={16} className="text-muted-foreground" />
+              </button>
+            </div>
           </div>
         </header>
 
-        {/* Content Area */}
-        <main className="flex-1 overflow-auto">
-          <div className="p-6">
-            {children}
+        <main className="min-h-[calc(100vh-4rem)] bg-background">
+          <div className="px-4 py-6 sm:px-6 lg:px-8">
+            <div className="animate-fade-in">{children}</div>
           </div>
         </main>
       </div>

@@ -5,15 +5,18 @@ import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { formatDateTime } from "@/lib/utils"
 import { FileText, Database } from "lucide-react"
+import { isCompanyAdminRole } from "@/lib/tenant"
 
 export default async function ImportHistoryPage() {
   const session = await getServerSession(authOptions)
   const role = (session?.user as any)?.role
-  if (!session || role !== "ADMIN") {
+  if (!session || !isCompanyAdminRole(role)) {
     redirect("/dashboard")
   }
+  const companyId = (session.user as any).companyId ?? null
 
   const history = await prisma.productImportHistory.findMany({
+    where: companyId ? { companyId } : {},
     orderBy: { createdAt: "desc" },
     take: 100,
     include: { importedBy: true },
@@ -66,7 +69,7 @@ export default async function ImportHistoryPage() {
                       <td className="p-3 text-sm">
                         {item.errorCount > 0 ? (
                           <details className="text-sm">
-                            <summary className="cursor-pointer text-blue-600 hover:underline">View errors</summary>
+                            <summary className="cursor-pointer text-foreground underline-offset-4 hover:underline">View errors</summary>
                             <div className="mt-2 max-h-64 overflow-auto text-xs bg-slate-50 border rounded p-3">
                               <pre>{JSON.stringify(item.errors, null, 2)}</pre>
                             </div>

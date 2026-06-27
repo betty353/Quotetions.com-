@@ -1,5 +1,5 @@
 {
-  "name": "quotely-crm",
+  "name": "quotetion-crm",
   "version": "1.0.0",
   "description": "Enterprise Quotation, Sales Follow-Up & Receipt Management Platform",
   "scripts": {
@@ -36,6 +36,7 @@
     "next": "^15.0.0",
     "next-auth": "^4.24.10",
     "next-cloudinary": "^6.3.0",
+    "nodemailer": "^7.0.13",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.50.1",
@@ -51,6 +52,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jspdf": "^2.0.0",
     "@types/node": "^20.10.6",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
     "autoprefixer": "^10.4.16",

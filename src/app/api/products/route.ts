@@ -10,8 +10,17 @@ export async function GET(request: NextRequest) {
   const pageSize = Number(searchParams.get("pageSize") || "20")
   const search = searchParams.get("search") || undefined
   const categoryId = searchParams.get("categoryId") || undefined
+  const companySlug = searchParams.get("companySlug") || undefined
+  const companyIdParam = searchParams.get("companyId") || undefined
 
   const where: any = { status: "ACTIVE" }
+  if (companySlug) {
+    const company = await prisma.company.findUnique({ where: { slug: companySlug }, select: { id: true } })
+    if (!company) return NextResponse.json({ data: [], total: 0, page, pageSize })
+    where.companyId = company.id
+  } else if (companyIdParam) {
+    where.companyId = companyIdParam
+  }
   if (search) {
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },
@@ -40,9 +49,21 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const validated = createProductSchema.parse(body)
+    const companyId = (session.user as any).companyId ?? null
+
+    const category = await prisma.category.findFirst({
+      where: {
+        id: validated.categoryId,
+        ...(companyId ? { OR: [{ companyId }, { companyId: null }] } : {}),
+      },
+    })
+    if (!category) {
+      return NextResponse.json({ error: "Category not found for this company" }, { status: 400 })
+    }
 
     const product = await prisma.product.create({
       data: {
+        companyId,
         sku: validated.sku,
         name: validated.name,
         description: validated.description || null,

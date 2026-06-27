@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useRef, useState } from "react"
+import Link from "next/link"
 
 function parseCSV(text: string) {
   const rows: string[][] = []
@@ -112,14 +113,22 @@ export default function ProductsActions() {
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      <a href="/api/products/export" className="inline-flex items-center px-4 py-2 bg-slate-800 text-white rounded-md text-sm hover:bg-slate-700">Export CSV</a>
+      <button
+        type="button"
+        onClick={() => {
+          window.location.href = "/api/products/export"
+        }}
+        className="inline-flex items-center px-4 py-2 bg-slate-800 text-white rounded-md text-sm hover:bg-slate-700"
+      >
+        Export CSV
+      </button>
 
       <label className="inline-flex items-center px-4 py-2 bg-white border rounded-md text-sm cursor-pointer">
         <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={() => handleFile()} className="sr-only" />
         {isImporting ? "Importing..." : "Import CSV"}
       </label>
 
-      <a href="/dashboard/products/import-history" className="inline-flex items-center px-4 py-2 bg-white border rounded-md text-sm hover:bg-slate-100">Import History</a>
+      <Link href="/dashboard/products/import-history" className="inline-flex items-center px-4 py-2 bg-white border rounded-md text-sm hover:bg-slate-100">Import History</Link>
 
       <div className="flex items-center gap-3">
         {message && <div className="text-sm text-muted-foreground">{message}</div>}

@@ -1,4 +1,4 @@
-# Quotely CRM - Enterprise Quotation Management Platform
+# Quotetion - Enterprise Quotation Management Platform
 
 A production-ready enterprise SaaS platform for managing products, customers, quotations, employee follow-ups, payments, receipts, reporting, and business operations.
 
@@ -105,7 +105,7 @@ npm run prisma:generate
 npm run prisma:migrate
 ```
 
-4. **Seed demo data (optional)**
+4. **Initialize empty production data**
 ```bash
 npm run prisma:seed
 ```

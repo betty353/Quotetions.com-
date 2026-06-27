@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     const created: any[] = []
     const errors: any[] = []
     const createdCategories = new Set<string>()
+    const companyId = (session.user as any).companyId ?? null
 
     for (const [index, item] of body.entries()) {
       try {
@@ -24,9 +25,9 @@ export async function POST(request: NextRequest) {
         } else if (item.category) {
           const categoryName = String(item.category).trim()
           if (categoryName) {
-            let cat = await prisma.category.findFirst({ where: { name: categoryName } })
+            let cat = await prisma.category.findFirst({ where: { name: categoryName, companyId } })
             if (!cat) {
-              cat = await prisma.category.create({ data: { name: categoryName } })
+              cat = await prisma.category.create({ data: { name: categoryName, companyId } })
               createdCategories.add(categoryName)
             }
             categoryId = cat.id
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
 
         const product = await prisma.product.create({
           data: {
+            companyId,
             sku: item.sku || undefined,
             name: item.name || undefined,
             description: item.description || null,
@@ -58,6 +60,7 @@ export async function POST(request: NextRequest) {
 
     await prisma.productImportHistory.create({
       data: {
+        companyId,
         importedById: session.user.id,
         source: "csv",
         createdCount: created.length,

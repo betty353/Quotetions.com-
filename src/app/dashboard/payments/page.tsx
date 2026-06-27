@@ -5,6 +5,8 @@ import { redirect } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { CreditCard } from "lucide-react"
+import ReconcileButton from "@/components/payments/ReconcileButton"
+import { Badge } from "@/components/ui/badge"
 
 export default async function PaymentsPage() {
   const session = await getServerSession(authOptions)
@@ -54,28 +56,35 @@ export default async function PaymentsPage() {
                   <th className="px-4 py-3">Quotation</th>
                   <th className="px-4 py-3">Customer</th>
                   <th className="px-4 py-3">Amount</th>
+                  <th className="px-4 py-3">Provider</th>
                   <th className="px-4 py-3">Method</th>
+                  <th className="px-4 py-3">Reference</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Date</th>
+                  {role !== "CUSTOMER" && <th className="px-4 py-3">Action</th>}
                 </tr>
               </thead>
               <tbody>
                 {payments.map((payment) => (
                   <tr key={payment.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-3">{payment.paymentNumber}</td>
-                    <td className="px-4 py-3">{payment.quotation?.quotationNumber || "—"}</td>
+                    <td className="px-4 py-3">{payment.quotation?.quotationNumber || "-"}</td>
                     <td className="px-4 py-3">{payment.customer?.companyName || payment.customer?.contactPerson || "Customer"}</td>
                     <td className="px-4 py-3">{formatCurrency(payment.amount)}</td>
+                    <td className="px-4 py-3">{payment.provider}</td>
                     <td className="px-4 py-3">{payment.method}</td>
-                    <td className="px-4 py-3">{payment.status}</td>
-                    <td className="px-4 py-3">{formatDate(payment.paymentDate)}</td>
+                    <td className="px-4 py-3">{payment.reference || "-"}</td>
                     <td className="px-4 py-3">
-                      {/* Reconcile button for staff */}
-                      <div>
-                        {/* @ts-expect-error client component in server file */}
-                        <ReconcileButton paymentId={payment.id} />
-                      </div>
+                      <Badge variant={payment.status === "COMPLETED" ? "success" : payment.status === "FAILED" || payment.status === "CANCELLED" ? "destructive" : "default"}>
+                        {payment.status}
+                      </Badge>
                     </td>
+                    <td className="px-4 py-3">{formatDate(payment.paymentDate)}</td>
+                    {role !== "CUSTOMER" && (
+                      <td className="px-4 py-3">
+                        <ReconcileButton paymentId={payment.id} />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

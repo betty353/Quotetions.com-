@@ -4,11 +4,11 @@ import { authOptions } from "@/lib/auth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { TrendingUp, Users, FileText, CreditCard, ArrowUpRight, ArrowDownLeft } from "lucide-react"
+import { TrendingUp, Users, FileText, CreditCard } from "lucide-react"
+import { isCompanyAdminRole } from "@/lib/tenant"
 
 async function getDashboardData(userId: string, userRole: string) {
-  if (userRole === "ADMIN") {
+  if (isCompanyAdminRole(userRole)) {
     // Admin Dashboard
     const [
       totalQuotations,
@@ -55,7 +55,7 @@ async function getDashboardData(userId: string, userRole: string) {
       quotationsByStatus,
       recentQuotations,
       topProducts,
-      conversionRate: ((quotationConversion.length / totalQuotations) * 100).toFixed(1),
+      conversionRate: totalQuotations > 0 ? ((quotationConversion.length / totalQuotations) * 100).toFixed(1) : "0.0",
     }
   } else if (userRole === "EMPLOYEE") {
     // Employee Dashboard
@@ -131,6 +131,11 @@ export default async function DashboardPage() {
   const userRole = (session.user as any).role
   const userId = (session.user as any).id
   const data = await getDashboardData(userId, userRole)
+  const paymentSetup = isCompanyAdminRole(userRole)
+    ? await prisma.companySetting.findFirst({
+        select: { paymentSetupComplete: true, paymentEnabled: true },
+      })
+    : null
 
   if (!data) {
     return (
@@ -141,14 +146,20 @@ export default async function DashboardPage() {
   }
 
   // Admin Dashboard
-  if (userRole === "ADMIN") {
+  if (isCompanyAdminRole(userRole)) {
     const adminData = data as any
     return (
       <div className="space-y-8">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-2">Welcome back. Here's your business overview.</p>
+          <p className="text-muted-foreground mt-2">Welcome back. Here&apos;s your business overview.</p>
+          <div className="mt-3 inline-flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+            <span className="text-slate-600">Payment setup:</span>
+            <Badge variant={paymentSetup?.paymentSetupComplete && paymentSetup.paymentEnabled ? "success" : "warning"}>
+              {paymentSetup?.paymentSetupComplete && paymentSetup.paymentEnabled ? "Ready" : "Incomplete"}
+            </Badge>
+          </div>
         </div>
 
         {/* Key Metrics */}
@@ -156,16 +167,11 @@ export default async function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Quotations</CardTitle>
-              <FileText className="h-4 w-4 text-blue-600" />
+              <FileText className="h-4 w-4 text-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{adminData.totalQuotations}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                <span className="text-green-600 flex items-center gap-1">
-                  <ArrowUpRight size={14} />
-                  +12% from last month
-                </span>
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">Live quotation records</p>
             </CardContent>
           </Card>
 
@@ -176,12 +182,7 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(adminData.totalRevenue)}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                <span className="text-green-600 flex items-center gap-1">
-                  <ArrowUpRight size={14} />
-                  +8% growth
-                </span>
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">From recorded quotations</p>
             </CardContent>
           </Card>
 
@@ -192,12 +193,7 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{adminData.totalCustomers}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                <span className="text-green-600 flex items-center gap-1">
-                  <ArrowUpRight size={14} />
-                  +5 new this month
-                </span>
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">Live customer records</p>
             </CardContent>
           </Card>
 
@@ -208,12 +204,7 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{adminData.conversionRate}%</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                <span className="text-red-600 flex items-center gap-1">
-                  <ArrowDownLeft size={14} />
-                  -2% from last month
-                </span>
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">Completed quotations only</p>
             </CardContent>
           </Card>
         </div>
@@ -272,7 +263,7 @@ export default async function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Assigned Quotations</CardTitle>
-              <FileText className="h-4 w-4 text-blue-600" />
+              <FileText className="h-4 w-4 text-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{employeeData.assignedQuotations}</div>
@@ -306,7 +297,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">My Quotations</CardTitle>
-            <FileText className="h-4 w-4 text-blue-600" />
+            <FileText className="h-4 w-4 text-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{customerData.myQuotations}</div>

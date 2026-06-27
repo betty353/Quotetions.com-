@@ -1,12 +1,18 @@
 import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { PrismaAdapter } from "@next-auth/prisma-adapter"
-import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
-import { isFirebaseAuthConfigured, signInFirebaseUser } from "@/lib/firebase-rest"
+import { prisma } from "@/lib/prisma"
+import { loginSchema } from "@/lib/schemas"
+import { auditAuthEvent } from "@/lib/audit"
+import { rateLimit } from "@/lib/rate-limit"
+import { normalizeLegacyRole } from "@/lib/tenant"
+
+const isProduction = process.env.NODE_ENV === "production"
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -15,60 +21,62 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Invalid credentials")
+        const parsed = loginSchema.safeParse(credentials)
+        if (!parsed.success) {
+          throw new Error("Invalid email or password")
+        }
+
+        const { email, password } = parsed.data
+        const limit = rateLimit(`login:${email}`, 8, 60_000)
+        if (!limit.ok) {
+          await auditAuthEvent({ action: "LOGIN_FAILED", email, metadata: { reason: "rate_limited" } })
+          throw new Error("Too many attempts. Please try again shortly.")
         }
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email },
+          select: {
+            id: true,
+            email: true,
+            password: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            companyId: true,
+            isActive: true,
+          },
         })
 
         if (!user) {
-          throw new Error("User not found")
+          await auditAuthEvent({ action: "LOGIN_FAILED", email, metadata: { reason: "invalid_credentials" } })
+          throw new Error("Invalid email or password")
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password)
+        if (!isPasswordValid) {
+          await auditAuthEvent({ action: "LOGIN_FAILED", userId: user.id, companyId: user.companyId, email, metadata: { reason: "invalid_credentials" } })
+          throw new Error("Invalid email or password")
         }
 
         if (!user.isActive) {
-          throw new Error("User account is inactive")
+          await auditAuthEvent({ action: "LOGIN_FAILED", userId: user.id, companyId: user.companyId, email, metadata: { reason: "inactive_user" } })
+          throw new Error("Invalid email or password")
         }
 
-        let isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        )
-
-        if (isFirebaseAuthConfigured()) {
-          try {
-            const firebaseUser = await signInFirebaseUser(credentials.email, credentials.password)
-            isPasswordValid = true
-
-            if (!user.firebaseUid) {
-              await prisma.user.update({
-                where: { id: user.id },
-                data: { firebaseUid: firebaseUser.uid },
-              })
-            }
-          } catch (error) {
-            if (user.firebaseUid) {
-              throw new Error("Invalid Firebase credentials")
-            }
-          }
-        }
-
-        if (!isPasswordValid) {
-          throw new Error("Invalid password")
-        }
-
-        // Update last login
         await prisma.user.update({
           where: { id: user.id },
           data: { lastLogin: new Date() },
         })
+        await auditAuthEvent({ action: "LOGIN", userId: user.id, companyId: user.companyId, email })
 
         return {
           id: user.id,
           email: user.email,
           name: `${user.firstName} ${user.lastName}`,
-          role: user.role,
+          role: normalizeLegacyRole(user.role) as any,
+          companyId: user.companyId,
+          firstName: user.firstName,
+          lastName: user.lastName,
         }
       },
     }),
@@ -76,26 +84,55 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = (user as any).role
         token.id = user.id
+        token.role = (user as any).role
+        token.companyId = (user as any).companyId ?? null
+        token.firstName = (user as any).firstName
+        token.lastName = (user as any).lastName
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.role = token.role
         session.user.id = token.id
+        session.user.role = token.role
+        session.user.companyId = token.companyId ?? null
+        session.user.firstName = token.firstName
+        session.user.lastName = token.lastName
       }
       return session
     },
   },
+  events: {
+    async signOut({ token }) {
+      if (token?.id) {
+        await auditAuthEvent({
+          action: "LOGOUT",
+          userId: token.id as string,
+          companyId: (token.companyId as string | null) ?? null,
+          email: typeof token.email === "string" ? token.email : null,
+        })
+      }
+    },
+  },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60,
+  },
+  cookies: {
+    sessionToken: {
+      name: `${isProduction ? "__Secure-" : ""}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: isProduction,
+      },
+    },
   },
   pages: {
     signIn: "/auth/login",
-    error: "/auth/error",
+    error: "/auth/login",
   },
-  debug: process.env.NODE_ENV === "development",
+  debug: false,
 }

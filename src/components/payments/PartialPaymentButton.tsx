@@ -56,6 +56,9 @@ export default function PartialPaymentButton({ quotationId, outstanding }: Props
                   <option value="MOBILE_MONEY">MOBILE_MONEY</option>
                   <option value="CARD">CARD</option>
                   <option value="CHEQUE">CHEQUE</option>
+                  <option value="AIRTEL_MONEY">AIRTEL_MONEY</option>
+                  <option value="MTN_MOBILE_MONEY">MTN_MOBILE_MONEY</option>
+                  <option value="ZAMTEL_KWACHA">ZAMTEL_KWACHA</option>
                   <option value="OTHER">OTHER</option>
                 </select>
               </label>

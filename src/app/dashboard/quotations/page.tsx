@@ -38,7 +38,7 @@ export default async function QuotationsPage() {
           <p className="text-sm text-muted-foreground mt-1">Manage your quotation pipeline, approvals, and customer follow-up.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/dashboard/quotations/new" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+          <Link href="/dashboard/quotations/new" className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             <PlusCircle size={16} /> Create Quotation
           </Link>
         </div>
@@ -87,7 +87,7 @@ export default async function QuotationsPage() {
               <tbody>
                 {quotations.map((quotation) => (
                   <tr key={quotation.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="px-4 py-3 text-blue-600 hover:underline">
+                    <td className="px-4 py-3 text-foreground underline-offset-4 hover:underline">
                       <Link href={`/dashboard/quotations/${quotation.id}`}>{quotation.quotationNumber}</Link>
                     </td>
                     <td className="px-4 py-3">{quotation.customer?.companyName || quotation.customer?.contactPerson || "Customer"}</td>

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { createPaymentSchema } from "@/lib/schemas"
 import requireRole from "@/lib/roles"
 import { ZodError } from "zod"
+import { createActivityLog, createAuditLog, syncQuotationPaymentState } from "@/lib/finance"
 
 export async function GET(request: NextRequest) {
   const session = await requireRole("ADMIN", "EMPLOYEE", "CUSTOMER")
@@ -38,14 +39,35 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validated = createPaymentSchema.parse(body)
 
-    const quotation = await prisma.quotation.findUnique({ where: { id: validated.quotationId } })
+    const quotation = await prisma.quotation.findUnique({
+      where: { id: validated.quotationId },
+      include: {
+        customer: { include: { user: true } },
+        payments: {
+          where: {
+            status: { in: ["PARTIAL", "COMPLETED"] },
+          },
+        },
+      },
+    })
     if (!quotation) return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
 
-    const customer = await prisma.customer.findUnique({ where: { id: quotation.customerId } })
-    if (!customer) return NextResponse.json({ error: "Customer not found" }, { status: 404 })
+    const existingPaid = quotation.payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
+    const outstanding = Math.max(0, Number(quotation.total) - existingPaid)
+    if (outstanding <= 0) {
+      return NextResponse.json({ error: "This quotation is already fully paid" }, { status: 409 })
+    }
+    if (validated.amount > outstanding + 0.005) {
+      return NextResponse.json(
+        { error: `Payment exceeds outstanding balance of ${outstanding.toFixed(2)}` },
+        { status: 400 }
+      )
+    }
 
     const count = await prisma.payment.count()
     const paymentNumber = `PM-${new Date().getFullYear()}-${String(count + 1).padStart(6, "0")}`
+    const cumulativePaid = existingPaid + Number(validated.amount)
+    const willComplete = cumulativePaid >= Number(quotation.total) - 0.005
 
     const payment = await prisma.payment.create({
       data: {
@@ -56,7 +78,8 @@ export async function POST(request: NextRequest) {
         method: validated.method,
         amount: validated.amount,
         currency: quotation.currency,
-        status: validated.amount >= Number(quotation.total) ? "COMPLETED" : "PARTIAL",
+        status: willComplete ? "COMPLETED" : "PARTIAL",
+        provider: "MANUAL",
         reference: validated.reference || null,
         notes: validated.notes || null,
         paymentDate: validated.paymentDate,
@@ -68,12 +91,54 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    if (validated.amount >= Number(quotation.total)) {
-      await prisma.quotation.update({
-        where: { id: quotation.id },
-        data: { status: "COMPLETED" },
-      })
-    }
+    await syncQuotationPaymentState(quotation.id)
+    await prisma.quotation.update({
+      where: { id: quotation.id },
+      data: {
+        paymentProvider: "MANUAL",
+        paymentMethod: validated.method,
+        paymentReference: validated.reference || null,
+      },
+    })
+    await createActivityLog({
+      customerId: quotation.customerId,
+      userId: session.user.id,
+      activityType: "PAYMENT_RECORDED",
+      description: `Payment ${payment.paymentNumber} recorded for ${quotation.quotationNumber}`,
+      details: {
+        amount: Number(payment.amount),
+        method: payment.method,
+        status: payment.status,
+        outstandingBefore: outstanding,
+      },
+      quotationId: quotation.id,
+      paymentId: payment.id,
+    })
+    await createAuditLog({
+      userId: session.user.id,
+      action: "CREATE",
+      entity: "Payment",
+      entityId: payment.id,
+      changes: {
+        paymentNumber: payment.paymentNumber,
+        quotationId: quotation.id,
+        amount: Number(payment.amount),
+        status: payment.status,
+      },
+    })
+    await prisma.notification.create({
+      data: {
+        userId: quotation.customer.userId,
+        type: "PAYMENT_RECORDED",
+        title: "Payment recorded",
+        message: `A payment of ${Number(payment.amount).toFixed(2)} was recorded for ${quotation.quotationNumber}.`,
+        relatedId: payment.id,
+        relatedModel: "Payment",
+        customerId: quotation.customerId,
+        quotationId: quotation.id,
+        paymentId: payment.id,
+      },
+    })
 
     return NextResponse.json({ data: payment }, { status: 201 })
   } catch (err: unknown) {

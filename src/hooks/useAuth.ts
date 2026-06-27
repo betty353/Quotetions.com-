@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react"
 import { UserRole } from "@prisma/client"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { isCompanyAdminRole } from "@/lib/tenant"
 
 export function useAuth() {
   const { data: session, status } = useSession()
@@ -38,11 +39,11 @@ export function useRequireRole(...roles: UserRole[]) {
 }
 
 export function useAdmin() {
-  return useRequireRole(UserRole.ADMIN)
+  return useRequireRole(UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN, UserRole.ADMIN)
 }
 
 export function useEmployee() {
-  return useRequireRole(UserRole.EMPLOYEE, UserRole.ADMIN)
+  return useRequireRole(UserRole.EMPLOYEE, UserRole.COMPANY_ADMIN, UserRole.SUPER_ADMIN, UserRole.ADMIN)
 }
 
 export function useCustomer() {
@@ -53,5 +54,5 @@ export function useCanEditQuotation(createdById: string, userId?: string) {
   const { user } = useAuth()
   const currentUserId = userId || (user as any)?.id
 
-  return (user as any)?.role === "ADMIN" || createdById === currentUserId
+  return isCompanyAdminRole((user as any)?.role) || createdById === currentUserId
 }

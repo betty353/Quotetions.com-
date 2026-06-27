@@ -3,14 +3,18 @@ import { redirect } from "next/navigation"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import CompanySettingsForm from "@/components/settings/CompanySettingsForm"
+import { isCompanyAdminRole } from "@/lib/tenant"
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions)
   if (!session) redirect("/dashboard")
 
-  if ((session.user as any).role !== "ADMIN") redirect("/dashboard")
+  if (!isCompanyAdminRole((session.user as any).role)) redirect("/dashboard")
 
-  const setting = await prisma.companySetting.findFirst()
+  const companyId = (session.user as any).companyId as string | null
+  if (!companyId) redirect("/dashboard")
+
+  const setting = await prisma.companySetting.findUnique({ where: { companyId } })
 
   return (
     <div className="space-y-6">

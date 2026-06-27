@@ -25,7 +25,7 @@ export default function DownloadReceiptPdf({ receiptId }: Props) {
   async function handleDownload() {
     try {
       const [receiptRes, settingsRes] = await Promise.all([
-        fetch(`/api/receipts`),
+        fetch(`/api/receipts/${receiptId}`),
         fetch(`/api/settings`),
       ])
 
@@ -35,7 +35,7 @@ export default function DownloadReceiptPdf({ receiptId }: Props) {
 
       const receiptJson = await receiptRes.json()
       const settingsJson = await settingsRes.json()
-      const receipt = (receiptJson.data || []).find((r: any) => r.id === receiptId)
+      const receipt = receiptJson.data
       if (!receipt) return alert("Receipt not found")
       const setting = settingsJson.data
 
@@ -58,18 +58,20 @@ export default function DownloadReceiptPdf({ receiptId }: Props) {
       doc.text(receipt.receiptNumber || "Receipt", 40, 100)
       doc.setFontSize(11)
       doc.text(setting.companyName || "", 40, 120)
-      doc.text(`Quotation: ${receipt.quotation?.quotationNumber || '—'}`, 40, 150)
+      doc.text(`Quotation: ${receipt.quotation?.quotationNumber || "-"}`, 40, 150)
       doc.text(`Customer: ${receipt.customer?.companyName || receipt.customer?.contactPerson || 'Customer'}`, 40, 170)
       doc.text(`Amount: ${receipt.amount}`, 40, 190)
       doc.text(`Method: ${receipt.paymentMethod}`, 40, 210)
       doc.text(`Reference: ${receipt.reference || '-'}`, 40, 230)
-      doc.text(`Notes: ${receipt.notes || '-'}`, 40, 250)
+      doc.text(`Paid Date: ${new Date(receipt.createdAt).toLocaleString()}`, 40, 250)
+      doc.text(`Payment Provider: ${receipt.provider || "MANUAL"}`, 40, 270)
+      doc.text(`Notes: ${receipt.notes || '-'}`, 40, 290)
 
       if (setting.signatureImageUrl) {
         try {
           const signatureData = await getBase64ImageFromUrl(setting.signatureImageUrl)
-          doc.addImage(signatureData, "PNG", 40, 280, 120, 40)
-          doc.text("Authorized Signature", 40, 330)
+          doc.addImage(signatureData, "PNG", 40, 320, 120, 40)
+          doc.text("Authorized Signature", 40, 370)
         } catch (error) {
           console.warn("Could not render signature", error)
         }

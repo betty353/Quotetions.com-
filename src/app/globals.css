@@ -5,83 +5,105 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 3.6%;
+    --foreground: 0 0% 9.8%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.6%;
+    --card-foreground: 0 0% 9.8%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.6%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 9.0%;
-    --accent-foreground: 0 0% 98%;
+    --popover-foreground: 0 0% 9.8%;
+    --muted: 60 11% 96.5%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 0 0% 9.8%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --primary: 262 100% 50%;
+    --border: 20 6% 90%;
+    --input: 20 6% 90%;
+    --primary: 0 0% 9.8%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 262 80% 50%;
-    --secondary-foreground: 0 0% 100%;
-    --ring: 262 100% 50%;
-    --radius: 0.5rem;
+    --secondary: 60 11% 96.5%;
+    --secondary-foreground: 0 0% 9.8%;
+    --ring: 0 0% 9.8%;
+    --radius: 0.75rem;
+    --sidebar: 60 20% 98.2%;
+    --sidebar-foreground: 0 0% 9.8%;
+    --surface: 60 11% 96.5%;
+    --surface-hover: 220 14% 96%;
+    --surface-selected: 0 0% 94%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --info: 199 89% 48%;
   }
 
   .dark {
-    --background: 0 0% 3.6%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 10%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 98%;
-    --accent-foreground: 0 0% 9.0%;
-    --destructive: 0 62.8% 30.6%;
+    --background: 220 13% 9%;
+    --foreground: 210 20% 96%;
+    --card: 220 12% 12%;
+    --card-foreground: 210 20% 96%;
+    --popover: 220 12% 12%;
+    --popover-foreground: 210 20% 96%;
+    --muted: 220 11% 15%;
+    --muted-foreground: 220 9% 68%;
+    --accent: 220 11% 17%;
+    --accent-foreground: 210 20% 96%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --primary: 262 100% 50%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 262 80% 50%;
-    --secondary-foreground: 0 0% 100%;
-    --ring: 262 100% 50%;
+    --border: 220 10% 22%;
+    --input: 220 10% 22%;
+    --primary: 0 0% 96%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 220 11% 17%;
+    --secondary-foreground: 210 20% 96%;
+    --ring: 0 0% 96%;
+    --sidebar: 220 13% 10%;
+    --sidebar-foreground: 210 20% 96%;
+    --surface: 220 11% 15%;
+    --surface-hover: 220 11% 18%;
+    --surface-selected: 0 0% 18%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --info: 199 89% 48%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: Inter, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  ::selection {
+    @apply bg-primary/15 text-foreground;
   }
 }
 
-* {
-  @apply border-border;
-}
-
-body {
-  @apply bg-background text-foreground;
-  font-feature-settings: "rounding-mode" 0;
-}
-
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-}
-
-/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-muted;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted-foreground rounded;
+  @apply rounded-full bg-slate-300/80 dark:bg-slate-700;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-foreground;
+  @apply bg-slate-400 dark:bg-slate-600;
 }
 
-/* Animations */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -102,10 +124,116 @@ html {
   }
 }
 
+@keyframes scaleIn {
+  from {
+    transform: scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 .animate-fade-in {
-  animation: fadeIn 0.3s ease-in;
+  animation: fadeIn 180ms ease-out;
 }
 
 .animate-slide-in-up {
-  animation: slideInUp 0.3s ease-out;
+  animation: slideInUp 220ms ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 180ms ease-out;
+}
+
+@layer components {
+  .page-shell {
+    @apply mx-auto w-full max-w-[1440px] space-y-6;
+  }
+
+  .page-heading {
+    @apply text-3xl font-semibold tracking-tight text-foreground;
+  }
+
+  .page-subtitle {
+    @apply mt-2 text-sm leading-6 text-muted-foreground;
+  }
+
+  .notion-table {
+    @apply min-w-full border-separate border-spacing-0 text-left text-sm;
+  }
+
+  .notion-table thead {
+    @apply sticky top-0 z-10 bg-card;
+  }
+
+  .notion-table th {
+    @apply border-b border-border px-4 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground;
+  }
+
+  .notion-table td {
+    @apply border-b border-border/70 px-4 py-3 align-middle;
+  }
+
+  .notion-table tbody tr {
+    @apply transition-colors duration-150 hover:bg-accent/70;
+  }
+
+  .field-shell {
+    @apply space-y-2;
+  }
+
+  main table {
+    @apply w-full border-separate border-spacing-0 text-left text-sm;
+  }
+
+  main table thead {
+    @apply sticky top-0 z-10 bg-card;
+  }
+
+  main table th {
+    @apply border-b border-border px-4 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground;
+  }
+
+  main table td {
+    @apply border-b border-border/70 px-4 py-3 align-middle;
+  }
+
+  main table tbody tr {
+    @apply transition-colors duration-150 hover:bg-accent/70;
+  }
+}
+
+@layer utilities {
+  .dark .bg-white {
+    @apply bg-card;
+  }
+
+  .dark .bg-slate-50,
+  .dark .bg-slate-100 {
+    @apply bg-surface;
+  }
+
+  .dark .bg-slate-800,
+  .dark .bg-slate-900 {
+    @apply bg-sidebar;
+  }
+
+  .dark .border-slate-100,
+  .dark .border-slate-200,
+  .dark .border-slate-700 {
+    @apply border-border;
+  }
+
+  .dark .text-slate-500,
+  .dark .text-slate-600 {
+    @apply text-muted-foreground;
+  }
+
+  .dark .text-slate-700,
+  .dark .text-slate-800,
+  .dark .text-gray-900 {
+    @apply text-foreground;
+  }
 }

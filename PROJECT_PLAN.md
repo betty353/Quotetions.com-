@@ -1,4 +1,4 @@
-Project Plan — Quotely CRM
+Project Plan - Quotetion
 
 Overview
 

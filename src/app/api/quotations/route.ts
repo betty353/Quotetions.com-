@@ -4,6 +4,7 @@ import { createQuotationSchema } from "@/lib/schemas"
 import requireRole from "@/lib/roles"
 import { generateQuotationNumber } from "@/lib/utils"
 import { ZodError } from "zod"
+import { createActivityLog, createAuditLog } from "@/lib/finance"
 
 export async function GET(request: NextRequest) {
   const session = await requireRole("ADMIN", "EMPLOYEE", "CUSTOMER")
@@ -113,8 +114,43 @@ export async function POST(request: NextRequest) {
         },
       },
       include: {
-        customer: true,
+        customer: { include: { user: true } },
         items: true,
+      },
+    })
+
+    await createActivityLog({
+      customerId,
+      userId: session.user.id,
+      activityType: "QUOTATION_CREATED",
+      description: `Quotation ${quotation.quotationNumber} created`,
+      details: {
+        total: totalAmount,
+        itemCount: itemData.length,
+      },
+      quotationId: quotation.id,
+    })
+    await createAuditLog({
+      userId: session.user.id,
+      action: "CREATE",
+      entity: "Quotation",
+      entityId: quotation.id,
+      changes: {
+        quotationNumber: quotation.quotationNumber,
+        total: totalAmount,
+        status: quotation.status,
+      },
+    })
+    await prisma.notification.create({
+      data: {
+        userId: quotation.customer.userId,
+        type: "QUOTATION_CREATED",
+        title: "Quotation created",
+        message: `Quotation ${quotation.quotationNumber} has been created.`,
+        relatedId: quotation.id,
+        relatedModel: "Quotation",
+        customerId,
+        quotationId: quotation.id,
       },
     })
 

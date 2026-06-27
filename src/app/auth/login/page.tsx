@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useState } from "react"
+import Image from "next/image"
 import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -45,18 +46,16 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold text-lg mb-4">
-            QC
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">Quotely CRM</h1>
+          <Image src="/logo.jpg" alt="Quotetion logo" width={64} height={64} className="mx-auto mb-4 h-16 w-16 rounded-lg object-contain" />
+          <h1 className="text-3xl font-bold text-gray-900">Quotetion</h1>
           <p className="text-gray-600 mt-2">Enterprise Quotation Management</p>
         </div>
 
-        <Card className="border-0 shadow-lg">
+        <Card>
           <CardHeader>
             <CardTitle>Welcome Back</CardTitle>
             <CardDescription>Sign in to your account to continue</CardDescription>
@@ -75,7 +74,7 @@ function LoginForm() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@company.com"
+                  placeholder="you@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
@@ -88,7 +87,7 @@ function LoginForm() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
@@ -98,7 +97,7 @@ function LoginForm() {
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                className="w-full"
                 disabled={isLoading}
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -108,18 +107,11 @@ function LoginForm() {
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
-                Don't have an account?{" "}
-                <Link href="/auth/register" className="text-blue-600 hover:text-blue-700 font-medium">
+                Don&apos;t have an account?{" "}
+                <Link href="/auth/register" className="font-medium text-foreground underline-offset-4 hover:underline">
                   Create one
                 </Link>
               </p>
-            </div>
-
-            {/* Demo credentials hint */}
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-xs text-blue-600 font-medium mb-2">Demo Credentials:</p>
-              <p className="text-xs text-blue-600">Admin: admin@company.com / password123</p>
-              <p className="text-xs text-blue-600">Customer: customer@gmail.com / password123</p>
             </div>
           </CardContent>
         </Card>
@@ -130,7 +122,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100" />}>
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
       <LoginForm />
     </Suspense>
   )

@@ -5,10 +5,17 @@ import { companySettingsSchema } from "@/lib/schemas"
 import { ZodError } from "zod"
 
 export async function GET() {
-  const setting = await prisma.companySetting.findFirst()
+  const session = await requireRole("ADMIN")
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const companyId = session.user.companyId
+  if (!companyId) return NextResponse.json({ error: "Company workspace required" }, { status: 400 })
+
+  const setting = await prisma.companySetting.findUnique({ where: { companyId } })
   if (!setting) {
     const defaultSetting = await prisma.companySetting.create({
       data: {
+        companyId,
         companyName: "",
         companyEmail: "",
         companyPhone: "",
@@ -30,12 +37,14 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   const session = await requireRole("ADMIN")
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const companyId = session.user.companyId
+  if (!companyId) return NextResponse.json({ error: "Company workspace required" }, { status: 400 })
 
   try {
     const body = await request.json()
     const validated = companySettingsSchema.parse(body)
 
-    const existing = await prisma.companySetting.findFirst()
+    const existing = await prisma.companySetting.findUnique({ where: { companyId } })
     if (existing) {
       const updated = await prisma.companySetting.update({
         where: { id: existing.id },
@@ -45,7 +54,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const created = await prisma.companySetting.create({
-      data: validated,
+      data: { ...validated, companyId },
     })
     return NextResponse.json({ data: created }, { status: 201 })
   } catch (err: unknown) {

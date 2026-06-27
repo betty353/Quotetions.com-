@@ -3,6 +3,7 @@
 import React, { useState } from "react"
 import Link from "next/link"
 import { formatCurrency } from "@/lib/utils"
+import SafeImage from "@/components/ui/safe-image"
 
 interface Product {
   id: string
@@ -89,7 +90,7 @@ export default function ProductsTable({ products }: { products: Product[] }) {
         <button onClick={clearAll} className="px-3 py-1 bg-slate-100 rounded">Clear</button>
         <button onClick={exportSelected} className="px-3 py-1 bg-white border rounded">Export Selected</button>
         <button onClick={handleDeleteSelected} disabled={processing} className="px-3 py-1 bg-red-600 text-white rounded">{processing ? 'Processing...' : 'Delete Selected'}</button>
-        <Link href="/dashboard/products/new" className="ml-auto text-white bg-blue-600 px-3 py-1 rounded">Add Product</Link>
+        <Link href="/dashboard/products/new" className="ml-auto rounded bg-primary px-3 py-1 text-primary-foreground hover:bg-primary/90">Add Product</Link>
       </div>
 
       <div className="overflow-x-auto">
@@ -113,7 +114,7 @@ export default function ProductsTable({ products }: { products: Product[] }) {
                 <td className="p-3 text-sm"><input type="checkbox" checked={!!selected[p.id]} onChange={() => toggle(p.id)} /></td>
                 <td className="p-3 text-sm">{p.sku}</td>
                 <td className="p-3 text-sm">
-                  {p.image ? <img src={p.image} alt={p.name} className="w-12 h-12 object-cover rounded" /> : <div className="w-12 h-12 bg-slate-100 rounded flex items-center justify-center text-xs text-muted-foreground">No Image</div>}
+                  {p.image ? <SafeImage src={p.image} alt={p.name} width={48} height={48} className="h-12 w-12 rounded object-cover" /> : <div className="w-12 h-12 bg-slate-100 rounded flex items-center justify-center text-xs text-muted-foreground">No Image</div>}
                 </td>
                 <td className="p-3 text-sm">{p.name}</td>
                 <td className="p-3 text-sm">{p.category?.name || '-'}</td>
@@ -122,7 +123,7 @@ export default function ProductsTable({ products }: { products: Product[] }) {
                 <td className="p-3 text-sm">{p.status}</td>
                 <td className="p-3 text-sm">
                   <div className="flex items-center gap-2">
-                    <Link href={`/dashboard/products/${p.id}`} className="text-blue-600 hover:underline">View</Link>
+                    <Link href={`/dashboard/products/${p.id}`} className="text-foreground underline-offset-4 hover:underline">View</Link>
                   </div>
                 </td>
               </tr>

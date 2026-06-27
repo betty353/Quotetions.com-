@@ -12,6 +12,8 @@ datasource db {
 
 // Enums
 enum UserRole {
+  SUPER_ADMIN
+  COMPANY_ADMIN
   ADMIN
   EMPLOYEE
   CUSTOMER
@@ -31,6 +33,8 @@ enum PaymentStatus {
   PENDING
   PARTIAL
   COMPLETED
+  FAILED
+  CANCELLED
   OVERDUE
 }
 
@@ -40,7 +44,27 @@ enum PaymentMethod {
   MOBILE_MONEY
   CARD
   CHEQUE
+  AIRTEL_MONEY
+  MTN_MOBILE_MONEY
+  ZAMTEL_KWACHA
   OTHER
+}
+
+enum PaymentProvider {
+  MANUAL
+  DPO
+}
+
+enum SettlementMethod {
+  BANK_ACCOUNT
+  AIRTEL_MONEY
+  MTN_MOBILE_MONEY
+  ZAMTEL_KWACHA
+}
+
+enum DpoEnvironment {
+  SANDBOX
+  PRODUCTION
 }
 
 enum FollowUpStatus {
@@ -63,7 +87,7 @@ enum NotificationType {
 // Users - for authentication
 model User {
   id                    String    @id @default(cuid())
-  firebaseUid           String?   @unique
+  companyId             String?
   email                 String    @unique
   password              String
   firstName             String
@@ -77,6 +101,8 @@ model User {
   updatedAt             DateTime  @updatedAt
 
   // Relations
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  ownedCompanies        Company[] @relation("CompanyOwner")
   customer              Customer?
   employee              Employee?
   account               Account?
@@ -89,9 +115,67 @@ model User {
   followUps             FollowUp[] @relation("FollowUpCreatedBy")
   activityLogs          ActivityLog[]
   productImportHistories ProductImportHistory[]
+  passwordResetTokens   PasswordResetToken[]
 
   @@index([email])
   @@index([role])
+  @@index([companyId])
+}
+
+model Company {
+  id                    String    @id @default(cuid())
+  name                  String
+  slug                  String    @unique
+  ownerId               String?
+  email                 String?
+  phone                 String?
+  about                 String?   @db.Text
+  logoUrl               String?
+  address               String?
+  city                  String?
+  region                String?
+  country               String?
+  postalCode            String?
+  taxId                 String?
+  registrationNumber    String?
+  website               String?
+  onboardingCompleted   Boolean   @default(false)
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  owner                 User?     @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  users                 User[]
+  customers             Customer[]
+  employees             Employee[]
+  products              Product[]
+  categories            Category[]
+  productImportHistories ProductImportHistory[]
+  quotations            Quotation[]
+  payments              Payment[]
+  receipts              Receipt[]
+  followUps             FollowUp[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+  activityLogs          ActivityLog[]
+  settings              CompanySetting?
+
+  @@index([ownerId])
+  @@index([slug])
+}
+
+model PasswordResetToken {
+  id                    String    @id @default(cuid())
+  userId                String
+  tokenHash             String    @unique
+  expiresAt             DateTime
+  usedAt                DateTime?
+  createdAt             DateTime  @default(now())
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // NextAuth Account
@@ -127,6 +211,7 @@ model Session {
 model Customer {
   id                    String    @id @default(cuid())
   userId                String    @unique
+  companyId             String?
   companyName           String?
   companyRegistration   String?
   taxId                 String?
@@ -145,6 +230,7 @@ model Customer {
 
   // Relations
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   quotations            Quotation[]
   payments              Payment[]
   receipts              Receipt[]
@@ -153,6 +239,7 @@ model Customer {
   activityLogs          ActivityLog[]
 
   @@index([userId])
+  @@index([companyId])
   @@index([companyName])
 }
 
@@ -160,6 +247,7 @@ model Customer {
 model Employee {
   id                    String    @id @default(cuid())
   userId                String    @unique
+  companyId             String?
   employeeId            String    @unique
   department            String?
   position              String?
@@ -176,18 +264,21 @@ model Employee {
 
   // Relations
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   quotations            Quotation[] @relation("AssignedEmployee")
   followUps             FollowUp[]
   activityLogs          ActivityLog[]
 
   @@index([userId])
+  @@index([companyId])
   @@index([employeeId])
 }
 
 // Products
 model Product {
   id                    String    @id @default(cuid())
-  sku                   String    @unique
+  companyId             String?
+  sku                   String
   name                  String
   description           String?   @db.Text
   categoryId            String
@@ -201,29 +292,38 @@ model Product {
   updatedAt             DateTime  @updatedAt
 
   // Relations
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   category              Category  @relation(fields: [categoryId], references: [id])
   quotationItems        QuotationItem[]
 
   @@index([categoryId])
+  @@index([companyId])
   @@index([sku])
   @@index([name])
+  @@unique([companyId, sku])
 }
 
 // Product Categories
 model Category {
   id                    String    @id @default(cuid())
-  name                  String    @unique
+  companyId             String?
+  name                  String
   description           String?
   icon                  String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   // Relations
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   products              Product[]
+
+  @@index([companyId])
+  @@unique([companyId, name])
 }
 
 model ProductImportHistory {
   id                  String   @id @default(cuid())
+  companyId           String?
   importedById        String
   source              String   @default("csv")
   createdCount        Int      @default(0)
@@ -233,8 +333,10 @@ model ProductImportHistory {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
+  company             Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
   importedBy          User     @relation(fields: [importedById], references: [id], onDelete: Cascade)
 
+  @@index([companyId])
   @@index([importedById])
   @@index([createdAt])
 }
@@ -242,6 +344,7 @@ model ProductImportHistory {
 // Quotations
 model Quotation {
   id                    String    @id @default(cuid())
+  companyId             String?
   quotationNumber       String    @unique
   customerId            String
   createdById           String
@@ -259,10 +362,19 @@ model Quotation {
   approvedAt            DateTime?
   rejectedAt            DateTime?
   rejectionReason       String?
+  paymentStatus         PaymentStatus @default(PENDING)
+  paymentProvider       PaymentProvider?
+  paymentMethod         PaymentMethod?
+  dpoTransactionToken   String?
+  paymentReference      String?
+  paidAt                DateTime?
+  receiptNumber         String?
+  settlementNote        String?   @db.Text
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   // Relations
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   customer              Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   createdBy             User      @relation("QuotationCreatedBy", fields: [createdById], references: [id])
   assignedEmployee      Employee? @relation("AssignedEmployee", fields: [assignedEmployeeId], references: [id])
@@ -274,6 +386,7 @@ model Quotation {
   activityLogs          ActivityLog[]
 
   @@index([customerId])
+  @@index([companyId])
   @@index([createdById])
   @@index([assignedEmployeeId])
   @@index([status])
@@ -304,6 +417,7 @@ model QuotationItem {
 // Payments
 model Payment {
   id                    String    @id @default(cuid())
+  companyId             String?
   paymentNumber         String    @unique
   quotationId           String
   customerId            String
@@ -314,18 +428,24 @@ model Payment {
   status                PaymentStatus @default(PENDING)
   reference             String?
   notes                 String?   @db.Text
+  provider              PaymentProvider @default(MANUAL)
+  dpoTransactionToken   String?   @unique
+  receiptNumber         String?
   paymentDate           DateTime
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   // Relations
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   quotation             Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   customer              Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   recordedBy            User      @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
+  receipts              Receipt[]
   notifications         Notification[]
   activityLogs          ActivityLog[]
 
   @@index([quotationId])
+  @@index([companyId])
   @@index([customerId])
   @@index([recordedById])
   @@index([status])
@@ -334,6 +454,7 @@ model Payment {
 // Receipts
 model Receipt {
   id                    String    @id @default(cuid())
+  companyId             String?
   receiptNumber         String    @unique
   quotationId           String
   customerId            String
@@ -343,18 +464,23 @@ model Receipt {
   paymentMethod         PaymentMethod
   reference             String?
   notes                 String?   @db.Text
+  provider              PaymentProvider @default(MANUAL)
+  paymentId             String?
   signatureImageUrl     String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   // Relations
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   quotation             Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   customer              Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   generatedBy           User      @relation("ReceiptGeneratedBy", fields: [generatedById], references: [id])
+  payment               Payment?  @relation(fields: [paymentId], references: [id])
   notifications         Notification[]
   activityLogs          ActivityLog[]
 
   @@index([quotationId])
+  @@index([companyId])
   @@index([customerId])
   @@index([generatedById])
 }
@@ -362,6 +488,7 @@ model Receipt {
 // Follow-ups/CRM
 model FollowUp {
   id                    String    @id @default(cuid())
+  companyId             String?
   quotationId           String
   customerId            String
   employeeId            String
@@ -378,6 +505,7 @@ model FollowUp {
   updatedAt             DateTime  @updatedAt
 
   // Relations
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   quotation             Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   customer              Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   employee              Employee  @relation(fields: [employeeId], references: [id])
@@ -386,6 +514,7 @@ model FollowUp {
   activityLogs          ActivityLog[]
 
   @@index([quotationId])
+  @@index([companyId])
   @@index([customerId])
   @@index([employeeId])
   @@index([status])
@@ -394,6 +523,7 @@ model FollowUp {
 // Notifications
 model Notification {
   id                    String    @id @default(cuid())
+  companyId             String?
   userId                String
   type                  NotificationType
   title                 String
@@ -405,6 +535,7 @@ model Notification {
   createdAt             DateTime  @default(now())
 
   // Relations
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   customer              Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   quotation             Quotation? @relation(fields: [quotationId], references: [id], onDelete: SetNull)
@@ -419,6 +550,7 @@ model Notification {
   receiptId             String?
 
   @@index([userId])
+  @@index([companyId])
   @@index([isRead])
   @@index([createdAt])
 }
@@ -426,7 +558,8 @@ model Notification {
 // Audit Logs
 model AuditLog {
   id                    String    @id @default(cuid())
-  userId                String
+  companyId             String?
+  userId                String?
   action                String    // CREATE, UPDATE, DELETE, VIEW
   entity                String    // Product, Quotation, Payment, etc.
   entityId              String
@@ -436,8 +569,10 @@ model AuditLog {
   createdAt             DateTime  @default(now())
 
   // Relations
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  user                  User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  @@index([companyId])
   @@index([userId])
   @@index([entity])
   @@index([entityId])
@@ -447,6 +582,7 @@ model AuditLog {
 // Activity Logs (timeline of customer interactions)
 model ActivityLog {
   id                    String    @id @default(cuid())
+  companyId             String?
   customerId            String
   userId                String?
   employeeId            String?
@@ -456,6 +592,7 @@ model ActivityLog {
   createdAt             DateTime  @default(now())
 
   // Relations
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   customer              Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   user                  User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   employee              Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
@@ -470,6 +607,7 @@ model ActivityLog {
   followUpId            String?
 
   @@index([customerId])
+  @@index([companyId])
   @@index([userId])
   @@index([activityType])
   @@index([createdAt])
@@ -478,6 +616,7 @@ model ActivityLog {
 // Company Settings
 model CompanySetting {
   id                    String    @id @default(cuid())
+  companyId             String?   @unique
   companyName           String
   companyEmail          String
   companyPhone          String
@@ -497,6 +636,22 @@ model CompanySetting {
   bankName              String?
   bankAccount           String?
   bankCode              String?
+  settlementMethod      SettlementMethod?
+  accountName           String?
+  accountNumber         String?
+  branch                String?
+  swiftCode             String?
+  mobileMoneyNetwork    String?
+  mobileMoneyBusinessName String?
+  mobileMoneyNumber     String?
+  dpoCompanyTokenEncrypted String? @db.Text
+  dpoServiceTypeEncrypted String? @db.Text
+  dpoMerchantId         String?
+  dpoCallbackUrl        String?
+  dpoReturnUrl          String?
+  dpoEnvironment        DpoEnvironment @default(SANDBOX)
+  paymentSetupComplete  Boolean   @default(false)
+  paymentEnabled        Boolean   @default(false)
   companyWebsite        String?
   companyLogo           String?
   signatureImageUrl     String?
@@ -505,4 +660,8 @@ model CompanySetting {
   businessHours         String?   @db.Text // JSON
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
 }

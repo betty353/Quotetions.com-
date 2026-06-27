@@ -76,7 +76,7 @@ export default function ReceiptForm({ quotationId, customerId, quotationTotal }:
         <div>
           <Label htmlFor="paymentMethod">Payment Method</Label>
           <select id="paymentMethod" {...register("paymentMethod")} className="w-full rounded border p-2">
-            {['CASH', 'BANK_TRANSFER', 'MOBILE_MONEY', 'CARD', 'CHEQUE', 'OTHER'].map((method) => (
+            {['CASH', 'BANK_TRANSFER', 'MOBILE_MONEY', 'CARD', 'CHEQUE', 'AIRTEL_MONEY', 'MTN_MOBILE_MONEY', 'ZAMTEL_KWACHA', 'OTHER'].map((method) => (
               <option key={method} value={method}>{method.replace('_', ' ')}</option>
             ))}
           </select>

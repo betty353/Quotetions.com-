@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import SafeImage from "@/components/ui/safe-image"
 
 type Category = { id: string; name: string }
 
@@ -162,7 +163,7 @@ export default function ProductForm({ categories = [], initial = {}, mode = "cre
         {uploadError && <div className="text-sm text-red-600">{uploadError}</div>}
         {filePreview && (
           <div className="mt-2">
-            <img src={filePreview} alt="preview" className="w-32 h-32 object-cover rounded-md" />
+            <SafeImage src={filePreview} alt="Product preview" width={128} height={128} className="h-32 w-32 rounded-md object-cover" />
           </div>
         )}
       </div>

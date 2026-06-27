@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import requireRole from "@/lib/roles"
+import { createActivityLog, createAuditLog, syncQuotationPaymentState } from "@/lib/finance"
 
 export async function GET(
   _request: NextRequest,
@@ -56,13 +57,31 @@ export async function PUT(
       include: { quotation: true, customer: true, recordedBy: true },
     })
 
-    // If payment completes the quotation, mark quotation as COMPLETED
-    if (updated.status === "COMPLETED") {
-      const quotation = await prisma.quotation.findUnique({ where: { id: updated.quotationId } })
-      if (quotation) {
-        await prisma.quotation.update({ where: { id: quotation.id }, data: { status: "COMPLETED" } })
-      }
-    }
+    await syncQuotationPaymentState(updated.quotationId)
+    await prisma.quotation.update({
+      where: { id: updated.quotationId },
+      data: {
+        paymentProvider: updated.provider,
+        paymentMethod: updated.method,
+        paymentReference: updated.reference,
+      },
+    })
+    await createActivityLog({
+      customerId: updated.customerId,
+      userId: session.user.id,
+      activityType: "PAYMENT_UPDATED",
+      description: `Payment ${updated.paymentNumber} updated`,
+      details: updateData,
+      quotationId: updated.quotationId,
+      paymentId: updated.id,
+    })
+    await createAuditLog({
+      userId: session.user.id,
+      action: "UPDATE",
+      entity: "Payment",
+      entityId: updated.id,
+      changes: updateData,
+    })
 
     return NextResponse.json({ data: updated })
   } catch (err: unknown) {

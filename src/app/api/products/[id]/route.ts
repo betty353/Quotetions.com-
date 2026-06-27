@@ -19,6 +19,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const body = await request.json()
     const validated = createProductSchema.parse(body)
+    const companyId = (session.user as any).companyId ?? null
+    const existing = await prisma.product.findUnique({ where: { id } })
+    if (!existing || (companyId && existing.companyId !== companyId)) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 })
+    }
 
     const product = await prisma.product.update({
       where: { id },
@@ -52,6 +57,11 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
+    const companyId = (session.user as any).companyId ?? null
+    const existing = await prisma.product.findUnique({ where: { id } })
+    if (!existing || (companyId && existing.companyId !== companyId)) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 })
+    }
     await prisma.product.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (err) {

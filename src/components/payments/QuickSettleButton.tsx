@@ -40,7 +40,7 @@ export default function QuickSettleButton({ quotationId, amount }: Props) {
 
   return (
     <div>
-      <button onClick={handleSettle} disabled={loading} className="px-2 py-1 bg-blue-600 text-white rounded text-sm">
+      <button onClick={handleSettle} disabled={loading} className="rounded bg-primary px-2 py-1 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
         {loading ? "Processing..." : "Quick Settle"}
       </button>
       {error && <div className="text-xs text-red-600 mt-1">{error}</div>}

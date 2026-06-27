@@ -55,18 +55,23 @@ export default async function ReceiptsPage() {
                   <th className="px-4 py-3">Quotation</th>
                   <th className="px-4 py-3">Customer</th>
                   <th className="px-4 py-3">Amount</th>
+                  <th className="px-4 py-3">Provider</th>
                   <th className="px-4 py-3">Method</th>
+                  <th className="px-4 py-3">Reference</th>
                   <th className="px-4 py-3">Created</th>
+                  <th className="px-4 py-3">Download</th>
                 </tr>
               </thead>
               <tbody>
                 {receipts.map((receipt) => (
                   <tr key={receipt.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-3">{receipt.receiptNumber}</td>
-                    <td className="px-4 py-3">{receipt.quotation?.quotationNumber || "—"}</td>
+                    <td className="px-4 py-3">{receipt.quotation?.quotationNumber || "-"}</td>
                     <td className="px-4 py-3">{receipt.customer?.companyName || receipt.customer?.contactPerson || "Customer"}</td>
                     <td className="px-4 py-3">{formatCurrency(receipt.amount)}</td>
+                    <td className="px-4 py-3">{receipt.provider}</td>
                     <td className="px-4 py-3">{receipt.paymentMethod}</td>
+                    <td className="px-4 py-3">{receipt.reference || "-"}</td>
                     <td className="px-4 py-3">{formatDateTime(receipt.createdAt)}</td>
                     <td className="px-4 py-3">
                       <DownloadReceiptPdf receiptId={receipt.id} />

@@ -3,16 +3,16 @@ import AppProviders from "@/components/providers/AppProviders"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Quotely CRM - Enterprise Quotation Management",
+  title: "Quotetion - Enterprise Quotation Management",
   description: "Professional quotation, sales follow-up & receipt management platform for modern businesses",
   keywords: "quotation, sales, CRM, receipt, invoice, business management",
-  authors: [{ name: "Quotely" }],
-  creator: "Quotely",
+  authors: [{ name: "Quotetion" }],
+  creator: "Quotetion",
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://quotely.com",
-    title: "Quotely CRM",
+    url: "https://quotetion.com",
+    title: "Quotetion",
     description: "Enterprise Quotation Management Platform",
   },
 }
@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
         <AppProviders>
           {children}

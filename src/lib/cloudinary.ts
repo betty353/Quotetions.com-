@@ -7,7 +7,7 @@ cloudinary.config({
   secure: true,
 })
 
-export async function uploadImageFromUrl(imageUrl: string, folder = "quotely/products") {
+export async function uploadImageFromUrl(imageUrl: string, folder = "quotetion/products") {
   if (!process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
     throw new Error("Cloudinary credentials not configured")
   }
@@ -22,7 +22,7 @@ export async function uploadImageFromUrl(imageUrl: string, folder = "quotely/pro
   return res
 }
 
-export async function uploadImageFromBase64(base64Image: string, folder = "quotely/products") {
+export async function uploadImageFromBase64(base64Image: string, folder = "quotetion/products") {
   if (!process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
     throw new Error("Cloudinary credentials not configured")
   }

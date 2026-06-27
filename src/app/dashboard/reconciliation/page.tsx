@@ -13,7 +13,12 @@ export default async function ReconciliationPage() {
 
   const quotations = await prisma.quotation.findMany({
     orderBy: { createdAt: 'desc' },
-    include: { customer: true, payments: true },
+    include: {
+      customer: true,
+      payments: {
+        where: { status: { in: ["PARTIAL", "COMPLETED"] } },
+      },
+    },
     take: 200,
   })
 
@@ -66,7 +71,7 @@ export default async function ReconciliationPage() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-3"><Link href={`/dashboard/quotations/${r.id}`} className="text-blue-600 hover:underline">{r.number}</Link></td>
+                  <td className="px-4 py-3"><Link href={`/dashboard/quotations/${r.id}`} className="text-foreground underline-offset-4 hover:underline">{r.number}</Link></td>
                   <td className="px-4 py-3">{r.customer?.companyName || r.customer?.contactPerson || 'Customer'}</td>
                   <td className="px-4 py-3">{formatCurrency(r.total)}</td>
                   <td className="px-4 py-3">{formatCurrency(r.paid)}</td>
@@ -75,7 +80,7 @@ export default async function ReconciliationPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <ReconciliationPaymentActions quotationId={r.id} outstanding={r.outstanding} />
-                      <Link href={`/dashboard/quotations/${r.id}`} className="text-sm text-blue-600 hover:underline">View</Link>
+                      <Link href={`/dashboard/quotations/${r.id}`} className="text-sm text-foreground underline-offset-4 hover:underline">View</Link>
                     </div>
                   </td>
                 </tr>
