@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, type ChangeEvent, type FormEvent, type ReactNode } from "react"
+import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { ArrowRight, Building2, CheckCircle2, CreditCard, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -55,6 +56,7 @@ const initialForm: FormState = {
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const { update } = useSession()
   const [form, setForm] = useState<FormState>(initialForm)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
@@ -84,6 +86,7 @@ export default function OnboardingPage() {
     try {
       const response = await fetch("/api/onboarding", {
         method: "PUT",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       })
@@ -99,7 +102,11 @@ export default function OnboardingPage() {
         return
       }
 
+      if (data.user) {
+        await update({ user: data.user })
+      }
       router.push(data.redirectTo || "/dashboard")
+      router.refresh()
     } catch {
       setStatus("Could not save onboarding.")
     } finally {

@@ -46,3 +46,4 @@ tsconfig.tsbuildinfo
 ehthumbs.db
 Thumbs.db
 .vercel
+.env.vercel.production

@@ -9,8 +9,10 @@ export default async function PaymentSetupPage() {
   const session = await getServerSession(authOptions)
   if (!session) redirect("/dashboard")
   if (!isCompanyAdminRole((session.user as any).role)) redirect("/dashboard")
+  const companyId = (session.user as any).companyId as string | null
+  if (!companyId) redirect("/onboarding")
 
-  const setting = await prisma.companySetting.findFirst()
+  const setting = await prisma.companySetting.findUnique({ where: { companyId } })
   const setup = setting
     ? {
         settlementMethod: setting.settlementMethod,

@@ -31,8 +31,10 @@ function safeSetup(setting: NonNullable<Awaited<ReturnType<typeof prisma.company
 export async function GET() {
   const session = await requireRole("ADMIN")
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const companyId = session.user.companyId
+  if (!companyId) return NextResponse.json({ error: "Company onboarding required" }, { status: 400 })
 
-  const setting = await prisma.companySetting.findFirst()
+  const setting = await prisma.companySetting.findUnique({ where: { companyId } })
   if (!setting) return NextResponse.json({ data: null })
 
   return NextResponse.json({ data: safeSetup(setting) })
@@ -41,11 +43,13 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   const session = await requireRole("ADMIN")
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const companyId = session.user.companyId
+  if (!companyId) return NextResponse.json({ error: "Company onboarding required" }, { status: 400 })
 
   try {
     const body = await request.json()
     const validated = paymentSetupSchema.parse(body)
-    const existing = await prisma.companySetting.findFirst()
+    const existing = await prisma.companySetting.findUnique({ where: { companyId } })
 
     if (!validated.dpoCompanyToken && !existing?.dpoCompanyTokenEncrypted) {
       return NextResponse.json({ error: "DPO company token is required" }, { status: 400 })
@@ -85,6 +89,7 @@ export async function PUT(request: NextRequest) {
             companyName: "Your Company",
             companyEmail: "admin@example.com",
             companyPhone: "",
+            companyId,
             defaultCurrency: "USD",
             taxRate: 0,
             quotationPrefix: "QT",

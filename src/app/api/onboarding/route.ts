@@ -4,88 +4,146 @@ import { ZodError } from "zod"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { onboardingSchema } from "@/lib/schemas"
-import { isCompanyAdminRole } from "@/lib/tenant"
+import { createUniqueCompanySlug, isCompanyAdminRole } from "@/lib/tenant"
 
 export async function PUT(request: NextRequest) {
   const session = await getServerSession(authOptions)
-  const companyId = session?.user?.companyId
 
-  if (!session?.user || !companyId || !isCompanyAdminRole(session.user.role)) {
+  if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   try {
     const body = await request.json()
     const validated = onboardingSchema.parse(body)
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        companyId: true,
+      },
+    })
 
-    const [company, setting] = await prisma.$transaction([
-      prisma.company.update({
-        where: { id: companyId },
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const companyData = {
+      name: validated.companyName,
+      email: validated.companyEmail,
+      phone: validated.companyPhone,
+      about: validated.about,
+      logoUrl: validated.logoUrl,
+      address: validated.address,
+      city: validated.city,
+      region: validated.region,
+      country: validated.country,
+      postalCode: validated.postalCode,
+      taxId: validated.taxId,
+      registrationNumber: validated.registrationNumber,
+      website: validated.website,
+      onboardingCompleted: true,
+    }
+
+    const settingData = {
+      companyName: validated.companyName,
+      companyEmail: validated.companyEmail,
+      companyPhone: validated.companyPhone,
+      companyAddress: validated.address,
+      companyCity: validated.city,
+      companyRegion: validated.region,
+      companyCountry: validated.country,
+      companyPostalCode: validated.postalCode,
+      companyTaxId: validated.taxId,
+      companyRegistration: validated.registrationNumber,
+      companyWebsite: validated.website,
+      companyLogo: validated.logoUrl,
+      defaultCurrency: validated.defaultCurrency,
+      taxRate: validated.taxRate,
+      quotationPrefix: validated.quotationPrefix,
+      receiptPrefix: validated.receiptPrefix,
+      paymentPrefix: validated.paymentPrefix,
+      quotationValidDays: validated.quotationValidDays,
+    }
+
+    if (user.companyId) {
+      if (!isCompanyAdminRole(user.role)) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+
+      const [company, setting] = await prisma.$transaction([
+        prisma.company.update({
+          where: { id: user.companyId },
+          data: companyData,
+        }),
+        prisma.companySetting.upsert({
+          where: { companyId: user.companyId },
+          update: settingData,
+          create: {
+            companyId: user.companyId,
+            ...settingData,
+            documentFont: "Helvetica",
+          },
+        }),
+      ])
+
+      return NextResponse.json({
+        company,
+        setting,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role === "ADMIN" ? "COMPANY_ADMIN" : user.role,
+          companyId: user.companyId,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+        redirectTo: "/dashboard/payment-setup",
+      })
+    }
+
+    const slug = await createUniqueCompanySlug(validated.companyName)
+    const result = await prisma.$transaction(async (tx) => {
+      const company = await tx.company.create({
         data: {
-          name: validated.companyName,
-          email: validated.companyEmail,
-          phone: validated.companyPhone,
-          about: validated.about,
-          logoUrl: validated.logoUrl,
-          address: validated.address,
-          city: validated.city,
-          region: validated.region,
-          country: validated.country,
-          postalCode: validated.postalCode,
-          taxId: validated.taxId,
-          registrationNumber: validated.registrationNumber,
-          website: validated.website,
-          onboardingCompleted: true,
+          ...companyData,
+          slug,
+          ownerId: user.id,
         },
-      }),
-      prisma.companySetting.upsert({
-        where: { companyId },
-        update: {
-          companyName: validated.companyName,
-          companyEmail: validated.companyEmail,
-          companyPhone: validated.companyPhone,
-          companyAddress: validated.address,
-          companyCity: validated.city,
-          companyRegion: validated.region,
-          companyCountry: validated.country,
-          companyPostalCode: validated.postalCode,
-          companyTaxId: validated.taxId,
-          companyRegistration: validated.registrationNumber,
-          companyWebsite: validated.website,
-          companyLogo: validated.logoUrl,
-          defaultCurrency: validated.defaultCurrency,
-          taxRate: validated.taxRate,
-          quotationPrefix: validated.quotationPrefix,
-          receiptPrefix: validated.receiptPrefix,
-          paymentPrefix: validated.paymentPrefix,
-          quotationValidDays: validated.quotationValidDays,
-        },
-        create: {
-          companyId,
-          companyName: validated.companyName,
-          companyEmail: validated.companyEmail,
-          companyPhone: validated.companyPhone,
-          companyAddress: validated.address,
-          companyCity: validated.city,
-          companyRegion: validated.region,
-          companyCountry: validated.country,
-          companyPostalCode: validated.postalCode,
-          companyTaxId: validated.taxId,
-          companyRegistration: validated.registrationNumber,
-          companyWebsite: validated.website,
-          companyLogo: validated.logoUrl,
-          defaultCurrency: validated.defaultCurrency,
-          taxRate: validated.taxRate,
-          quotationPrefix: validated.quotationPrefix,
-          receiptPrefix: validated.receiptPrefix,
-          paymentPrefix: validated.paymentPrefix,
-          quotationValidDays: validated.quotationValidDays,
+      })
+
+      const setting = await tx.companySetting.create({
+        data: {
+          companyId: company.id,
+          ...settingData,
           documentFont: "Helvetica",
         },
-      }),
-    ])
+      })
 
-    return NextResponse.json({ company, setting, redirectTo: "/dashboard/payment-setup" })
+      const updatedUser = await tx.user.update({
+        where: { id: user.id },
+        data: {
+          companyId: company.id,
+          role: "COMPANY_ADMIN",
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          companyId: true,
+          firstName: true,
+          lastName: true,
+        },
+      })
+
+      return { company, setting, user: updatedUser }
+    })
+
+    return NextResponse.json({ ...result, redirectTo: "/dashboard/payment-setup" })
   } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: "Validation failed", details: error.errors }, { status: 400 })
