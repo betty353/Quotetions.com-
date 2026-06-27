@@ -19,7 +19,9 @@ type AccountType = "BUSINESS" | "CUSTOMER"
 function RegisterForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const initialType = searchParams.get("type") === "customer" ? "CUSTOMER" : "BUSINESS"
+  const initialCompanySlug = searchParams.get("companySlug") || ""
+  const isStoreCustomerFlow = searchParams.get("type") === "customer" || Boolean(initialCompanySlug)
+  const initialType = isStoreCustomerFlow ? "CUSTOMER" : "BUSINESS"
   const [accountType, setAccountType] = useState<AccountType>(initialType)
   const [formData, setFormData] = useState({
     firstName: "",
@@ -27,7 +29,7 @@ function RegisterForm() {
     email: "",
     phone: "",
     companyName: "",
-    companySlug: searchParams.get("companySlug") || "",
+    companySlug: initialCompanySlug,
     password: "",
     confirmPassword: "",
   })
@@ -126,38 +128,52 @@ function RegisterForm() {
       <div className="mx-auto w-full max-w-5xl">
         <div className="mb-8 text-center">
           <Image src="/logo.jpg" alt="Quotetion logo" width={64} height={64} className="mx-auto mb-4 h-16 w-16 rounded-xl object-contain" />
-          <h1 className="text-3xl font-semibold tracking-tight">Create your account</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Choose the account type that matches how you use Quotetion.</p>
+          <h1 className="text-3xl font-semibold tracking-tight">{isStoreCustomerFlow ? "Create customer account" : "Create your account"}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {isStoreCustomerFlow
+              ? "Sign up to request quotations, track payments, and download receipts from this company."
+              : "Choose the account type that matches how you use Quotetion."}
+          </p>
         </div>
 
         <Card className="mx-auto max-w-3xl">
           <CardHeader>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setAccountType("BUSINESS")}
-                className={cn(
-                  "rounded-xl border p-4 text-left transition-colors",
-                  accountType === "BUSINESS" ? "border-primary bg-surface-selected" : "border-border hover:bg-accent"
-                )}
-              >
-                <Building2 className="mb-3 h-5 w-5 text-primary" />
-                <CardTitle className="text-base">Business / Company Account</CardTitle>
-                <CardDescription>Create a company workspace and manage products, quotes, payments, and customers.</CardDescription>
-              </button>
-              <button
-                type="button"
-                onClick={() => setAccountType("CUSTOMER")}
-                className={cn(
-                  "rounded-xl border p-4 text-left transition-colors",
-                  accountType === "CUSTOMER" ? "border-primary bg-surface-selected" : "border-border hover:bg-accent"
-                )}
-              >
+            {isStoreCustomerFlow ? (
+              <div className="rounded-xl border border-primary bg-surface-selected p-4 text-left">
                 <ShoppingBag className="mb-3 h-5 w-5 text-primary" />
                 <CardTitle className="text-base">Customer Account</CardTitle>
-                <CardDescription>Browse company stores, request quotations, pay, and download receipts.</CardDescription>
-              </button>
-            </div>
+                <CardDescription>
+                  Connected to store: <span className="font-medium text-foreground">{formData.companySlug}</span>
+                </CardDescription>
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setAccountType("BUSINESS")}
+                  className={cn(
+                    "rounded-xl border p-4 text-left transition-colors",
+                    accountType === "BUSINESS" ? "border-primary bg-surface-selected" : "border-border hover:bg-accent"
+                  )}
+                >
+                  <Building2 className="mb-3 h-5 w-5 text-primary" />
+                  <CardTitle className="text-base">Business / Company Account</CardTitle>
+                  <CardDescription>Create a company workspace and manage products, quotes, payments, and customers.</CardDescription>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountType("CUSTOMER")}
+                  className={cn(
+                    "rounded-xl border p-4 text-left transition-colors",
+                    accountType === "CUSTOMER" ? "border-primary bg-surface-selected" : "border-border hover:bg-accent"
+                  )}
+                >
+                  <ShoppingBag className="mb-3 h-5 w-5 text-primary" />
+                  <CardTitle className="text-base">Customer Account</CardTitle>
+                  <CardDescription>Browse company stores, request quotations, pay, and download receipts.</CardDescription>
+                </button>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {error && (
@@ -179,6 +195,8 @@ function RegisterForm() {
 
               {accountType === "BUSINESS" ? (
                 <Field id="companyName" label="Company Name" value={formData.companyName} onChange={handleChange} error={validationErrors.companyName} />
+              ) : isStoreCustomerFlow ? (
+                <input type="hidden" name="companySlug" value={formData.companySlug} />
               ) : (
                 <Field id="companySlug" label="Company Store Slug (optional)" value={formData.companySlug} onChange={handleChange} error={validationErrors.companySlug} placeholder="denuel-technologies" />
               )}
@@ -197,6 +215,11 @@ function RegisterForm() {
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Already have an account? <Link href="/auth/login" className="font-medium text-primary hover:underline">Sign in</Link>
             </p>
+            {isStoreCustomerFlow && (
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                Use your customer email address. A company/admin email that already exists cannot be registered again.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

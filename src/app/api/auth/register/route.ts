@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     if (existingUser) {
       await auditAuthEvent({ action: "REGISTER", email, request, metadata: { blocked: true, reason: "email_exists" } })
-      return NextResponse.json({ error: "Email already registered" }, { status: 400 })
+      return NextResponse.json({ error: "This email already has an account. Please sign in instead, or use a different customer email." }, { status: 400 })
     }
 
     const hashedPassword = await bcrypt.hash(validatedData.password, 12)
@@ -126,6 +126,11 @@ export async function POST(request: NextRequest) {
         ? await prisma.company.findUnique({ where: { slug: validatedData.companySlug } })
         : null
 
+    if ((validatedData.companyId || validatedData.companySlug) && (!company || !company.isActive)) {
+      await auditAuthEvent({ action: "REGISTER", email, request, metadata: { blocked: true, reason: "company_not_found", companySlug: validatedData.companySlug } })
+      return NextResponse.json({ error: "Company store not found. Please use the latest store link from the company." }, { status: 400 })
+    }
+
     const user = await prisma.user.create({
       data: {
         email,
@@ -167,7 +172,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         message: "Customer account created successfully",
-        redirectTo: company ? `/store/${company.slug}` : "/dashboard",
+        redirectTo: company ? `/dashboard/quotations/new?companySlug=${company.slug}` : "/dashboard",
       },
       { status: 201 }
     )
