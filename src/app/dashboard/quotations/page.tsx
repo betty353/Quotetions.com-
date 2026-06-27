@@ -6,13 +6,23 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { FileText, PlusCircle } from "lucide-react"
+import { isCompanyAdminRole } from "@/lib/tenant"
 
 export default async function QuotationsPage() {
   const session = await getServerSession(authOptions)
   if (!session) return null
+  const role = (session.user as any).role
+  const companyId = (session.user as any).companyId as string | null
+  const customer = role === "CUSTOMER"
+    ? await prisma.customer.findUnique({ where: { userId: session.user.id } })
+    : null
+  const where = role === "CUSTOMER"
+    ? customer ? { customerId: customer.id } : { id: "__none__" }
+    : companyId ? { companyId } : {}
 
   const [quotations, statusGroups] = await Promise.all([
     prisma.quotation.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {
@@ -21,6 +31,7 @@ export default async function QuotationsPage() {
       },
     }),
     prisma.quotation.groupBy({
+      where,
       by: ["status"],
       _count: { status: true },
     }),
@@ -34,13 +45,15 @@ export default async function QuotationsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Quotations</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage your quotation pipeline, approvals, and customer follow-up.</p>
+          <h1 className="text-3xl font-bold">{role === "CUSTOMER" ? "My Quotations" : "Quotations"}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{role === "CUSTOMER" ? "View quotation requests, approval status, and payment progress." : "Manage your quotation pipeline, approvals, and customer follow-up."}</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/dashboard/quotations/new" className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            <PlusCircle size={16} /> Create Quotation
-          </Link>
+          {(role === "CUSTOMER" || isCompanyAdminRole(role) || role === "EMPLOYEE") && (
+            <Link href="/dashboard/quotations/new" className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+              <PlusCircle size={16} /> {role === "CUSTOMER" ? "Request Quotation" : "Create Quotation"}
+            </Link>
+          )}
         </div>
       </div>
 
@@ -63,8 +76,8 @@ export default async function QuotationsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Quotation List</CardTitle>
-          <CardDescription>Latest quotations across the system.</CardDescription>
+          <CardTitle>{role === "CUSTOMER" ? "Your Quotation Requests" : "Quotation List"}</CardTitle>
+          <CardDescription>{role === "CUSTOMER" ? "Only quotations linked to your customer account are shown." : "Latest quotations for this company."}</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {quotations.length === 0 ? (
@@ -77,8 +90,8 @@ export default async function QuotationsPage() {
               <thead className="border-b border-slate-200 text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Quotation#</th>
-                  <th className="px-4 py-3">Customer</th>
-                  <th className="px-4 py-3">Created By</th>
+                  {role !== "CUSTOMER" && <th className="px-4 py-3">Customer</th>}
+                  {role !== "CUSTOMER" && <th className="px-4 py-3">Created By</th>}
                   <th className="px-4 py-3">Total</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Date</th>
@@ -90,8 +103,8 @@ export default async function QuotationsPage() {
                     <td className="px-4 py-3 text-foreground underline-offset-4 hover:underline">
                       <Link href={`/dashboard/quotations/${quotation.id}`}>{quotation.quotationNumber}</Link>
                     </td>
-                    <td className="px-4 py-3">{quotation.customer?.companyName || quotation.customer?.contactPerson || "Customer"}</td>
-                    <td className="px-4 py-3">{quotation.createdBy ? `${quotation.createdBy.firstName} ${quotation.createdBy.lastName}` : "System"}</td>
+                    {role !== "CUSTOMER" && <td className="px-4 py-3">{quotation.customer?.companyName || quotation.customer?.contactPerson || "Customer"}</td>}
+                    {role !== "CUSTOMER" && <td className="px-4 py-3">{quotation.createdBy ? `${quotation.createdBy.firstName} ${quotation.createdBy.lastName}` : "System"}</td>}
                     <td className="px-4 py-3 font-semibold">{formatCurrency(quotation.total)}</td>
                     <td className="px-4 py-3">
                       <Badge variant={quotation.status === "COMPLETED" ? "success" : quotation.status === "APPROVED" ? "secondary" : quotation.status === "REJECTED" ? "destructive" : quotation.status === "VIEWED" ? "outline" : "default"}>

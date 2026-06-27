@@ -3,15 +3,28 @@ import { prisma } from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import QuotationForm from "@/components/quotations/QuotationForm"
+import { isCompanyAdminRole } from "@/lib/tenant"
 
-export default async function NewQuotationPage() {
+type NewQuotationPageProps = {
+  searchParams?: Promise<{ companySlug?: string }>
+}
+
+export default async function NewQuotationPage({ searchParams }: NewQuotationPageProps) {
   const session = await getServerSession(authOptions)
   if (!session) redirect("/dashboard")
+  const resolvedSearchParams = searchParams ? await searchParams : {}
 
   const role = (session.user as any).role
+  const sessionCompanyId = (session.user as any).companyId as string | null
   const customer = role === "CUSTOMER"
     ? await prisma.customer.findUnique({ where: { userId: session.user.id } })
     : null
+  const storeCompany = resolvedSearchParams.companySlug
+    ? await prisma.company.findUnique({ where: { slug: resolvedSearchParams.companySlug }, select: { id: true, slug: true, name: true } })
+    : null
+  const targetCompanyId = role === "CUSTOMER"
+    ? customer?.companyId || storeCompany?.id || null
+    : sessionCompanyId
 
   const customers = role === "CUSTOMER"
     ? customer ? [{
@@ -21,20 +34,23 @@ export default async function NewQuotationPage() {
       email: session.user.email ?? undefined,
     }] : []
     : await prisma.customer.findMany({
+      where: targetCompanyId ? { companyId: targetCompanyId } : {},
       orderBy: { companyName: "asc" },
       include: { user: true },
     })
 
   const products = await prisma.product.findMany({
-    where: { status: "ACTIVE" },
+    where: { status: "ACTIVE", ...(targetCompanyId ? { companyId: targetCompanyId } : {}) },
     orderBy: { name: "asc" },
   })
+  const canCreate = role === "CUSTOMER" || role === "EMPLOYEE" || isCompanyAdminRole(role)
+  if (!canCreate) redirect("/dashboard")
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">New Quotation</h1>
-        <p className="text-sm text-muted-foreground mt-1">Create a new customer quotation with configurable line items.</p>
+        <h1 className="text-2xl font-bold">{role === "CUSTOMER" ? "Request Quotation" : "New Quotation"}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{role === "CUSTOMER" ? "Select products or services and submit your quotation request." : "Create a new customer quotation with configurable line items."}</p>
       </div>
 
       {products.length === 0 ? (

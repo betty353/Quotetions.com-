@@ -13,11 +13,14 @@ export default async function PaymentsPage() {
   if (!session) redirect("/dashboard")
 
   const role = (session.user as any).role
+  const companyId = (session.user as any).companyId as string | null
   const where: any = {}
   if (role === "CUSTOMER") {
     const customer = await prisma.customer.findUnique({ where: { userId: session.user.id } })
     if (!customer) return <div className="text-center py-12">Customer profile not found</div>
     where.customerId = customer.id
+  } else if (companyId) {
+    where.companyId = companyId
   }
 
   const payments = await prisma.payment.findMany({

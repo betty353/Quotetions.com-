@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   const status = url.searchParams.get("status") || undefined
 
   const role = (session.user as any).role
+  const sessionCompanyId = session.user.companyId
   const where: any = {}
 
   if (status) {
@@ -26,6 +27,8 @@ export async function GET(request: NextRequest) {
     const customer = await prisma.customer.findUnique({ where: { userId: session.user.id } })
     if (!customer) return NextResponse.json({ error: "Customer profile not found" }, { status: 404 })
     where.customerId = customer.id
+  } else if (sessionCompanyId) {
+    where.companyId = sessionCompanyId
   }
 
   const total = await prisma.quotation.count({ where })
@@ -54,15 +57,23 @@ export async function POST(request: NextRequest) {
 
     let customerId = validated.customerId
     const role = (session.user as any).role
+    let companyId = session.user.companyId ?? null
 
     if (role === "CUSTOMER") {
       const customer = await prisma.customer.findUnique({ where: { userId: session.user.id } })
       if (!customer) return NextResponse.json({ error: "Customer profile not found" }, { status: 404 })
       customerId = customer.id
+      companyId = customer.companyId
+    }
+    if (!companyId) return NextResponse.json({ error: "Company context is required" }, { status: 400 })
+
+    const customer = await prisma.customer.findUnique({ where: { id: customerId }, select: { id: true, companyId: true } })
+    if (!customer || customer.companyId !== companyId) {
+      return NextResponse.json({ error: "Customer does not belong to this company" }, { status: 403 })
     }
 
     const productIds = validated.items.map((item) => item.productId)
-    const products = await prisma.product.findMany({ where: { id: { in: productIds } } })
+    const products = await prisma.product.findMany({ where: { id: { in: productIds }, companyId } })
     const productMap = new Map(products.map((product) => [product.id, product]))
 
     const itemData = validated.items.map((item) => {
@@ -91,11 +102,13 @@ export async function POST(request: NextRequest) {
     const discountAmount = itemData.reduce((sum, item) => sum + item.discount, 0)
     const taxAmount = 0
     const totalAmount = itemData.reduce((sum, item) => sum + item.total, 0)
-    const count = await prisma.quotation.count()
-    const quotationNumber = generateQuotationNumber("QT", count + 1)
+    const setting = await prisma.companySetting.findUnique({ where: { companyId }, select: { quotationPrefix: true, defaultCurrency: true } })
+    const count = await prisma.quotation.count({ where: { companyId } })
+    const quotationNumber = generateQuotationNumber(setting?.quotationPrefix || "QT", count + 1)
 
     const quotation = await prisma.quotation.create({
       data: {
+        companyId,
         quotationNumber,
         customerId,
         createdById: session.user.id,
@@ -108,7 +121,7 @@ export async function POST(request: NextRequest) {
         taxAmount,
         discountAmount,
         total: totalAmount,
-        currency: "USD",
+        currency: setting?.defaultCurrency || "USD",
         items: {
           create: itemData,
         },
@@ -120,6 +133,7 @@ export async function POST(request: NextRequest) {
     })
 
     await createActivityLog({
+      companyId,
       customerId,
       userId: session.user.id,
       activityType: "QUOTATION_CREATED",
@@ -131,6 +145,7 @@ export async function POST(request: NextRequest) {
       quotationId: quotation.id,
     })
     await createAuditLog({
+      companyId,
       userId: session.user.id,
       action: "CREATE",
       entity: "Quotation",
@@ -144,6 +159,7 @@ export async function POST(request: NextRequest) {
     await prisma.notification.create({
       data: {
         userId: quotation.customer.userId,
+        companyId,
         type: "QUOTATION_CREATED",
         title: "Quotation created",
         message: `Quotation ${quotation.quotationNumber} has been created.`,

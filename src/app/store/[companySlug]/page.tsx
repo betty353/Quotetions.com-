@@ -1,10 +1,12 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { getServerSession } from "next-auth"
 import { Search, ShoppingCart } from "lucide-react"
 import SafeImage from "@/components/ui/safe-image"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
 type StorePageProps = {
@@ -13,6 +15,7 @@ type StorePageProps = {
 }
 
 export default async function StorePage({ params, searchParams }: StorePageProps) {
+  const session = await getServerSession(authOptions)
   const resolvedParams = await params
   const resolvedSearchParams = searchParams ? await searchParams : {}
   const query = resolvedSearchParams.q?.trim() || ""
@@ -48,6 +51,10 @@ export default async function StorePage({ params, searchParams }: StorePageProps
   if (!company || !company.isActive) notFound()
 
   const currency = company.settings?.defaultCurrency || "ZMW"
+  const isCustomer = session?.user?.role === "CUSTOMER"
+  const customerCta = isCustomer
+    ? `/dashboard/quotations/new?companySlug=${company.slug}`
+    : `/auth/register?type=customer&companySlug=${company.slug}`
 
   return (
     <main className="min-h-screen bg-background">
@@ -72,11 +79,11 @@ export default async function StorePage({ params, searchParams }: StorePageProps
             </div>
           </div>
           <Link
-            href={`/auth/register?type=customer&companySlug=${company.slug}`}
+            href={customerCta}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-[0_1px_2px_rgba(37,99,235,0.18)] transition-all duration-200 hover:-translate-y-px hover:bg-primary/90"
           >
             <ShoppingCart className="h-4 w-4" />
-            Customer account
+            {isCustomer ? "Request quotation" : "Customer account"}
           </Link>
         </div>
       </section>
@@ -120,7 +127,7 @@ export default async function StorePage({ params, searchParams }: StorePageProps
                   </div>
                   {product.description && <p className="line-clamp-3 text-sm text-muted-foreground">{product.description}</p>}
                   <Link
-                    href={`/auth/register?type=customer&companySlug=${company.slug}`}
+                    href={customerCta}
                     className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-input bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
                   >
                     Request quotation

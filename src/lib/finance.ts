@@ -51,6 +51,7 @@ export async function syncQuotationPaymentState(quotationId: string) {
 }
 
 export async function createActivityLog(input: {
+  companyId?: string | null
   customerId: string
   userId?: string | null
   employeeId?: string | null
@@ -65,6 +66,7 @@ export async function createActivityLog(input: {
   return prisma.activityLog.create({
     data: {
       customerId: input.customerId,
+      companyId: input.companyId ?? null,
       userId: input.userId ?? null,
       employeeId: input.employeeId ?? null,
       activityType: input.activityType,
@@ -79,6 +81,7 @@ export async function createActivityLog(input: {
 }
 
 export async function createAuditLog(input: {
+  companyId?: string | null
   userId: string
   action: string
   entity: string
@@ -88,6 +91,7 @@ export async function createAuditLog(input: {
   return prisma.auditLog.create({
     data: {
       userId: input.userId,
+      companyId: input.companyId ?? null,
       action: input.action,
       entity: input.entity,
       entityId: input.entityId,

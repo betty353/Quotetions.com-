@@ -42,18 +42,23 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
   }
 
   const role = (session.user as any).role
+  const companyId = (session.user as any).companyId as string | null
   if (role === "CUSTOMER") {
     const customer = await prisma.customer.findUnique({ where: { userId: session.user.id } })
     if (!customer || customer.id !== quotation.customerId) {
       redirect("/dashboard")
     }
+  } else if (companyId && quotation.companyId !== companyId) {
+    redirect("/dashboard")
   }
 
-  const employees = await prisma.employee.findMany({
+  const employees = role === "CUSTOMER" ? [] : await prisma.employee.findMany({
+    where: companyId ? { companyId } : {},
     orderBy: { employeeId: "asc" },
     include: { user: true },
   })
   const paymentSetup = await prisma.companySetting.findFirst({
+    where: quotation.companyId ? { companyId: quotation.companyId } : {},
     select: {
       paymentSetupComplete: true,
       paymentEnabled: true,
@@ -306,50 +311,54 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
         </div>
 
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Update Status</CardTitle>
-              <CardDescription>Change quotation workflow state.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <QuotationStatusForm quotationId={quotation.id} currentStatus={quotation.status} />
-            </CardContent>
-          </Card>
+          {role !== "CUSTOMER" && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Update Status</CardTitle>
+                  <CardDescription>Change quotation workflow state.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <QuotationStatusForm quotationId={quotation.id} currentStatus={quotation.status} />
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Follow Ups</CardTitle>
-              <CardDescription>Track follow-up actions for this customer.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FollowUpForm
-                quotationId={quotation.id}
-                customerId={quotation.customerId}
-                employees={employees.map((employee) => ({
-                  id: employee.id,
-                  user: { name: `${employee.user.firstName} ${employee.user.lastName}` },
-                }))}
-              />
-              {quotation.followUps.length > 0 ? (
-                <div className="mt-6 space-y-3">
-                  {quotation.followUps.map((followUp) => (
-                    <div key={followUp.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold">{followUp.type}</p>
-                        <Badge variant={followUp.status === "COMPLETED" ? "success" : followUp.status === "CANCELLED" ? "destructive" : "default"}>
-                          {followUp.status}
-                        </Badge>
-                      </div>
-                      <p className="mt-2 text-sm text-slate-700">{followUp.feedback || followUp.callNotes || followUp.meetingNotes || "No notes added."}</p>
-                      <p className="mt-2 text-xs text-slate-500">Next follow-up: {followUp.nextFollowUpDate ? formatDate(followUp.nextFollowUpDate) : "Not scheduled"}</p>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Follow Ups</CardTitle>
+                  <CardDescription>Track follow-up actions for this customer.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <FollowUpForm
+                    quotationId={quotation.id}
+                    customerId={quotation.customerId}
+                    employees={employees.map((employee) => ({
+                      id: employee.id,
+                      user: { name: `${employee.user.firstName} ${employee.user.lastName}` },
+                    }))}
+                  />
+                  {quotation.followUps.length > 0 ? (
+                    <div className="mt-6 space-y-3">
+                      {quotation.followUps.map((followUp) => (
+                        <div key={followUp.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-semibold">{followUp.type}</p>
+                            <Badge variant={followUp.status === "COMPLETED" ? "success" : followUp.status === "CANCELLED" ? "destructive" : "default"}>
+                              {followUp.status}
+                            </Badge>
+                          </div>
+                          <p className="mt-2 text-sm text-slate-700">{followUp.feedback || followUp.callNotes || followUp.meetingNotes || "No notes added."}</p>
+                          <p className="mt-2 text-xs text-slate-500">Next follow-up: {followUp.nextFollowUpDate ? formatDate(followUp.nextFollowUpDate) : "Not scheduled"}</p>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground mt-4">No follow-ups scheduled yet.</p>
-              )}
-            </CardContent>
-          </Card>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-4">No follow-ups scheduled yet.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
       </div>
     </div>
