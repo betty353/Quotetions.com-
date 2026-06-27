@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
+import { getToken } from "next-auth/jwt"
 import { ZodError } from "zod"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -8,16 +9,24 @@ import { createUniqueCompanySlug, isCompanyAdminRole } from "@/lib/tenant"
 
 export async function PUT(request: NextRequest) {
   const session = await getServerSession(authOptions)
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+  const sessionEmail = session?.user?.email || (typeof token?.email === "string" ? token.email : null)
+  const sessionUserId = session?.user?.id || (typeof token?.id === "string" ? token.id : typeof token?.sub === "string" ? token.sub : null)
 
-  if (!session?.user?.email) {
+  if (!sessionEmail && !sessionUserId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   try {
     const body = await request.json()
     const validated = onboardingSchema.parse(body)
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          ...(sessionEmail ? [{ email: sessionEmail }] : []),
+          ...(sessionUserId ? [{ id: sessionUserId }] : []),
+        ],
+      },
       select: {
         id: true,
         email: true,

@@ -33,7 +33,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl)
     }
 
-    const needsAdmin = pathname.startsWith("/onboarding") || adminPrefixes.some((prefix) => pathname.startsWith(prefix))
+    const needsAdmin = adminPrefixes.some((prefix) => pathname.startsWith(prefix))
     if (needsAdmin && !isAdminRole(token.role)) {
       return NextResponse.redirect(new URL("/dashboard", request.url))
     }

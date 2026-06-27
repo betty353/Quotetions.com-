@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react"
 import Image from "next/image"
+import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Building2, Loader2, ShoppingBag } from "lucide-react"
@@ -101,7 +102,18 @@ function RegisterForm() {
         return
       }
 
-      router.push(data.redirectTo || (accountType === "BUSINESS" ? "/onboarding" : "/auth/login?registered=true"))
+      const signInResult = await signIn("credentials", {
+        email: parsed.data.email,
+        password: formData.password,
+        redirect: false,
+      })
+
+      if (signInResult?.error) {
+        router.push(`/auth/login?registered=true&callbackUrl=${encodeURIComponent(data.redirectTo || "/dashboard")}`)
+        return
+      }
+
+      router.push(data.redirectTo || (accountType === "BUSINESS" ? "/onboarding" : "/dashboard"))
     } catch {
       setError("An unexpected error occurred. Please try again.")
     } finally {
