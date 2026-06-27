@@ -14,7 +14,10 @@ export default async function SettingsPage() {
   const companyId = (session.user as any).companyId as string | null
   if (!companyId) redirect("/dashboard")
 
-  const setting = await prisma.companySetting.findUnique({ where: { companyId } })
+  const [setting, company] = await Promise.all([
+    prisma.companySetting.findUnique({ where: { companyId } }),
+    prisma.company.findUnique({ where: { id: companyId }, select: { slug: true } }),
+  ])
 
   return (
     <div className="space-y-6">
@@ -23,7 +26,7 @@ export default async function SettingsPage() {
         <p className="text-sm text-muted-foreground mt-1">Configure company branding, logos, signature, and document formatting.</p>
       </div>
 
-      <CompanySettingsForm setting={setting} />
+      <CompanySettingsForm setting={setting} companySlug={company?.slug || null} />
     </div>
   )
 }

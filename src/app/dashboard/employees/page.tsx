@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
+import bcrypt from "bcryptjs"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,53 +19,92 @@ async function createEmployee(formData: FormData) {
   const session = await getServerSession(authOptions)
   if (!session || !isCompanyAdminRole((session.user as any).role)) redirect("/dashboard")
 
-  const userId = String(formData.get("userId") || "")
-  const department = String(formData.get("department") || "")
-  const position = String(formData.get("position") || "")
+  const companyId = (session.user as any).companyId as string | null
+  if (!companyId) redirect("/dashboard")
+
+  const firstName = String(formData.get("firstName") || "").trim()
+  const lastName = String(formData.get("lastName") || "").trim()
+  const email = String(formData.get("email") || "").trim().toLowerCase()
+  const phone = String(formData.get("phone") || "").trim()
+  const password = String(formData.get("password") || "")
+  const department = String(formData.get("department") || "").trim()
+  const position = String(formData.get("position") || "").trim()
   const quotaTarget = Number(formData.get("quotaTarget") || 0)
 
-  if (!userId) return
+  if (!firstName || !lastName || !email || password.length < 8) redirect("/dashboard/employees?error=missing-worker-fields")
 
-  const existing = await prisma.employee.findUnique({ where: { userId } })
-  if (existing) return
+  const existingUser = await prisma.user.findUnique({ where: { email }, include: { employee: true } })
+  if (existingUser?.employee) redirect("/dashboard/employees?error=worker-exists")
+  if (existingUser && existingUser.companyId && existingUser.companyId !== companyId) redirect("/dashboard/employees?error=email-in-use")
 
   const count = await prisma.employee.count()
-  const employee = await prisma.employee.create({
-    data: {
-      userId,
-      employeeId: generateEmployeeId(count + 1),
-      department: department || null,
-      position: position || null,
-      quotaTarget: quotaTarget > 0 ? quotaTarget : null,
-      status: "ACTIVE",
-    },
-  })
+  const passwordHash = await bcrypt.hash(password, 12)
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { role: "EMPLOYEE" },
+  const employee = await prisma.$transaction(async (tx) => {
+    const user = existingUser
+      ? await tx.user.update({
+          where: { id: existingUser.id },
+          data: {
+            companyId,
+            firstName,
+            lastName,
+            phone: phone || null,
+            role: "EMPLOYEE",
+            isActive: true,
+          },
+        })
+      : await tx.user.create({
+          data: {
+            companyId,
+            email,
+            password: passwordHash,
+            firstName,
+            lastName,
+            phone: phone || null,
+            role: "EMPLOYEE",
+            isActive: true,
+          },
+        })
+
+    return tx.employee.create({
+      data: {
+        userId: user.id,
+        companyId,
+        employeeId: generateEmployeeId(count + 1),
+        department: department || null,
+        position: position || null,
+        phone: phone || null,
+        quotaTarget: quotaTarget > 0 ? quotaTarget : null,
+        status: "ACTIVE",
+      },
+    })
   })
 
   await prisma.auditLog.create({
     data: {
+      companyId,
       userId: (session.user as any).id,
       action: "CREATE",
       entity: "Employee",
       entityId: employee.id,
-      changes: JSON.stringify({ userId, employeeId: employee.employeeId, department, position }),
+      changes: JSON.stringify({ employeeId: employee.employeeId, email, department, position }),
     },
   })
 
   revalidatePath("/dashboard/employees")
+  redirect("/dashboard/employees?created=1")
 }
 
-export default async function EmployeesPage() {
+export default async function EmployeesPage({ searchParams }: { searchParams?: Promise<{ created?: string; error?: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session) redirect("/dashboard")
   if (!isCompanyAdminRole((session.user as any).role)) redirect("/dashboard")
+  const params = await searchParams
+  const companyId = (session.user as any).companyId as string | null
+  if (!companyId) redirect("/dashboard")
 
-  const [employees, eligibleUsers] = await Promise.all([
-    prisma.employee.findMany({
+  const employees = await prisma.employee.findMany({
+      where: { companyId },
       orderBy: { employeeId: "asc" },
       include: {
         user: true,
@@ -77,16 +117,7 @@ export default async function EmployeesPage() {
         },
         followUps: true,
       },
-    }),
-    prisma.user.findMany({
-      where: {
-        role: { in: ["CUSTOMER", "EMPLOYEE"] },
-        employee: null,
-      },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    }),
-  ])
+    })
 
   const rows = employees.map((employee) => {
     const assignedValue = employee.quotations.reduce((sum, quotation) => sum + Number(quotation.total), 0)
@@ -108,39 +139,49 @@ export default async function EmployeesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Add Employee</CardTitle>
-          <CardDescription>Convert an existing account into an employee profile.</CardDescription>
+          <CardTitle>Add Worker</CardTitle>
+          <CardDescription>Create a staff account and assign the worker to a department.</CardDescription>
         </CardHeader>
         <CardContent>
-          {eligibleUsers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No eligible user accounts are available.</p>
-          ) : (
-            <form action={createEmployee} className="grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr_1fr_auto] lg:items-end">
-              <div>
-                <Label htmlFor="userId">User</Label>
-                <select id="userId" name="userId" className="mt-2 w-full rounded border p-2">
-                  {eligibleUsers.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.firstName} {user.lastName} - {user.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="department">Department</Label>
-                <Input id="department" name="department" placeholder="Sales" />
-              </div>
-              <div>
-                <Label htmlFor="position">Position</Label>
-                <Input id="position" name="position" placeholder="Sales Rep" />
-              </div>
-              <div>
-                <Label htmlFor="quotaTarget">Quota Target</Label>
-                <Input id="quotaTarget" name="quotaTarget" type="number" min="0" step="0.01" />
-              </div>
-              <Button type="submit">Add</Button>
-            </form>
-          )}
+          {params?.created && <p className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">Worker added successfully.</p>}
+          {params?.error && <p className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">Could not add worker. Check the email, password, and required fields.</p>}
+          <form action={createEmployee} className="grid gap-4 lg:grid-cols-3">
+            <div>
+              <Label htmlFor="firstName">First Name</Label>
+              <Input id="firstName" name="firstName" required placeholder="Emmanuel" />
+            </div>
+            <div>
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input id="lastName" name="lastName" required placeholder="Inambao" />
+            </div>
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" name="email" type="email" required placeholder="worker@company.com" />
+            </div>
+            <div>
+              <Label htmlFor="phone">Phone</Label>
+              <Input id="phone" name="phone" placeholder="0770000000" />
+            </div>
+            <div>
+              <Label htmlFor="password">Temporary Password</Label>
+              <Input id="password" name="password" type="password" minLength={8} required />
+            </div>
+            <div>
+              <Label htmlFor="department">Department</Label>
+              <Input id="department" name="department" placeholder="Sales" />
+            </div>
+            <div>
+              <Label htmlFor="position">Position</Label>
+              <Input id="position" name="position" placeholder="Sales Rep" />
+            </div>
+            <div>
+              <Label htmlFor="quotaTarget">Quota Target</Label>
+              <Input id="quotaTarget" name="quotaTarget" type="number" min="0" step="0.01" />
+            </div>
+            <div className="flex items-end">
+              <Button type="submit" className="w-full">Add Worker</Button>
+            </div>
+          </form>
         </CardContent>
       </Card>
 

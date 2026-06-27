@@ -45,6 +45,7 @@ export default function ReceiptForm({ quotationId, customerId, quotationTotal }:
       const res = await fetch("/api/receipts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(values),
       })
       const data: ApiResponse = await res.json()

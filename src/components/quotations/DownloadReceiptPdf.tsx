@@ -24,20 +24,23 @@ async function getBase64ImageFromUrl(url: string) {
 export default function DownloadReceiptPdf({ receiptId }: Props) {
   async function handleDownload() {
     try {
-      const [receiptRes, settingsRes] = await Promise.all([
-        fetch(`/api/receipts/${receiptId}`),
-        fetch(`/api/settings`),
-      ])
+      const receiptRes = await fetch(`/api/receipts/${receiptId}`, { credentials: "include" })
 
-      if (!receiptRes.ok || !settingsRes.ok) {
-        throw new Error("Failed to load receipt or settings")
+      if (!receiptRes.ok) {
+        throw new Error("Failed to load receipt")
       }
 
       const receiptJson = await receiptRes.json()
-      const settingsJson = await settingsRes.json()
       const receipt = receiptJson.data
       if (!receipt) return alert("Receipt not found")
-      const setting = settingsJson.data
+
+      let setting = receipt.company?.settings
+      const settingsRes = await fetch(`/api/settings`, { credentials: "include" })
+      if (settingsRes.ok) {
+        const settingsJson = await settingsRes.json()
+        setting = settingsJson.data || setting
+      }
+      setting = setting || {}
 
       const doc = new jsPDF({ unit: "pt" })
       const fontName = ["Helvetica", "Times", "Courier"].includes(setting.documentFont)
@@ -67,9 +70,10 @@ export default function DownloadReceiptPdf({ receiptId }: Props) {
       doc.text(`Payment Provider: ${receipt.provider || "MANUAL"}`, 40, 270)
       doc.text(`Notes: ${receipt.notes || '-'}`, 40, 290)
 
-      if (setting.signatureImageUrl) {
+      const signatureImageUrl = receipt.signatureImageUrl || setting.signatureImageUrl
+      if (signatureImageUrl) {
         try {
-          const signatureData = await getBase64ImageFromUrl(setting.signatureImageUrl)
+          const signatureData = await getBase64ImageFromUrl(signatureImageUrl)
           doc.addImage(signatureData, "PNG", 40, 320, 120, 40)
           doc.text("Authorized Signature", 40, 370)
         } catch (error) {

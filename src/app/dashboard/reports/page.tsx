@@ -14,6 +14,8 @@ export default async function ReportsPage() {
 
   const role = (session.user as any).role
   if (!isCompanyAdminRole(role) && role !== "EMPLOYEE") redirect("/dashboard")
+  const companyId = (session.user as any).companyId as string | null
+  if (!companyId) redirect("/dashboard")
 
   const [
     quotations,
@@ -24,23 +26,26 @@ export default async function ReportsPage() {
     employees,
   ] = await Promise.all([
     prisma.quotation.findMany({
+      where: { companyId },
       include: {
         customer: true,
         payments: { where: { status: { in: ["PARTIAL", "COMPLETED"] } } },
       },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.payment.findMany({ where: { status: { in: ["PARTIAL", "COMPLETED"] } } }),
-    prisma.receipt.findMany(),
-    prisma.quotation.groupBy({ by: ["status"], _count: true }),
+    prisma.payment.findMany({ where: { companyId, status: { in: ["PARTIAL", "COMPLETED"] } } }),
+    prisma.receipt.findMany({ where: { companyId } }),
+    prisma.quotation.groupBy({ by: ["status"], where: { companyId }, _count: true }),
     prisma.quotationItem.groupBy({
       by: ["productId"],
+      where: { quotation: { companyId } },
       _sum: { quantity: true, total: true },
       _count: true,
       orderBy: { _sum: { total: "desc" } },
       take: 10,
     }),
     prisma.employee.findMany({
+      where: { companyId },
       include: {
         user: true,
         quotations: {
@@ -54,7 +59,7 @@ export default async function ReportsPage() {
 
   const productIds = topProductRows.map((row) => row.productId)
   const products = await prisma.product.findMany({
-    where: { id: { in: productIds } },
+    where: { companyId, id: { in: productIds } },
     include: { category: true },
   })
   const productMap = new Map(products.map((product) => [product.id, product]))

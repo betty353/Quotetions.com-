@@ -11,12 +11,17 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const role = (session.user as any).role
+  const companyId = (session.user as any).companyId as string | null
   const where: any = {}
 
   if (role === "CUSTOMER") {
     const customer = await prisma.customer.findUnique({ where: { userId: session.user.id } })
     if (!customer) return NextResponse.json({ error: "Customer profile not found" }, { status: 404 })
     where.customerId = customer.id
+  } else if (companyId) {
+    where.companyId = companyId
+  } else {
+    return NextResponse.json({ error: "Company workspace required" }, { status: 400 })
   }
 
   const receipts = await prisma.receipt.findMany({
@@ -35,6 +40,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await requireRole("ADMIN", "EMPLOYEE")
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const companyId = (session.user as any).companyId as string | null
+  if (!companyId) return NextResponse.json({ error: "Company workspace required" }, { status: 400 })
 
   try {
     const body = await request.json()
@@ -53,6 +60,11 @@ export async function POST(request: NextRequest) {
       },
     })
     if (!quotation) return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
+    if (quotation.companyId !== companyId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+    }
+
+    const companySetting = await prisma.companySetting.findUnique({ where: { companyId } })
 
     const totalPaid = quotation.payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
     const totalReceipted = quotation.receipts.reduce((sum, receipt) => sum + Number(receipt.amount), 0)
@@ -77,10 +89,11 @@ export async function POST(request: NextRequest) {
       orderBy: { paymentDate: "desc" },
     })
 
-    const receiptNumber = await generateUniqueReceiptNumber()
+    const receiptNumber = await generateUniqueReceiptNumber(companySetting?.receiptPrefix || "RCT")
 
     const receipt = await prisma.receipt.create({
       data: {
+        companyId,
         receiptNumber,
         quotationId: validated.quotationId,
         customerId: quotation.customerId,
@@ -92,6 +105,7 @@ export async function POST(request: NextRequest) {
         notes: validated.notes || null,
         provider: "MANUAL",
         paymentId: payment?.id ?? null,
+        signatureImageUrl: companySetting?.signatureImageUrl || null,
       },
       include: {
         quotation: true,
@@ -111,6 +125,7 @@ export async function POST(request: NextRequest) {
       },
     })
     await createActivityLog({
+      companyId,
       customerId: quotation.customerId,
       userId: session.user.id,
       activityType: "RECEIPT_GENERATED",
@@ -125,6 +140,7 @@ export async function POST(request: NextRequest) {
       receiptId: receipt.id,
     })
     await createAuditLog({
+      companyId,
       userId: session.user.id,
       action: "CREATE",
       entity: "Receipt",

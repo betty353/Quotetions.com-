@@ -17,17 +17,23 @@ export async function GET(
       customer: { include: { user: true } },
       generatedBy: true,
       payment: true,
+      company: { include: { settings: true } },
     },
   })
 
   if (!receipt) return NextResponse.json({ error: "Receipt not found" }, { status: 404 })
 
   const role = (session.user as any).role
+  const companyId = (session.user as any).companyId as string | null
   if (role === "CUSTOMER") {
     const customer = await prisma.customer.findUnique({ where: { userId: session.user.id } })
     if (!customer || customer.id !== receipt.customerId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
+  } else if (companyId && receipt.companyId !== companyId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+  } else if (!companyId) {
+    return NextResponse.json({ error: "Company workspace required" }, { status: 400 })
   }
 
   return NextResponse.json({ data: receipt })

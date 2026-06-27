@@ -41,27 +41,27 @@ import { cn } from "@/lib/utils"
 import { useTheme } from "@/components/providers/ThemeProvider"
 
 const sidebarItems = [
-  { icon: BarChart3, label: "Dashboard", href: "/dashboard", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: Users, label: "Customers", href: "/dashboard/customers", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
-  { icon: Package, label: "Products & Services", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
-  { icon: FileText, label: "Quotations", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: ShoppingCart, label: "Orders", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: WalletCards, label: "Invoices", href: "/dashboard/receipts", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: Receipt, label: "Receipts", href: "/dashboard/receipts", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: CreditCard, label: "Payments", href: "/dashboard/payments", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: BarChart3, label: "Reports", href: "/dashboard/reports", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
-  { icon: PackageSearch, label: "Inventory", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
-  { icon: Truck, label: "Suppliers", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
-  { icon: Building2, label: "Company Profile", href: "/dashboard/settings", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
-  { icon: UserCog, label: "Users", href: "/dashboard/employees", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
-  { icon: Landmark, label: "Payment Setup", href: "/dashboard/payment-setup", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
-  { icon: Settings, label: "Integrations", href: "/dashboard/payment-setup", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
-  { icon: Settings, label: "Settings", href: "/dashboard/settings", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
-  { icon: Activity, label: "Activity Logs", href: "/dashboard/notifications", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: LifeBuoy, label: "Support", href: "/dashboard/notifications", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: CalendarCheck, label: "Follow-Ups", href: "/dashboard/followups", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: Landmark, label: "Reconciliation", href: "/dashboard/reconciliation", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
-  { icon: BellRing, label: "Notifications", href: "/dashboard/notifications", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: BarChart3, iconColor: "text-blue-600", label: "Dashboard", href: "/dashboard", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: Users, iconColor: "text-emerald-600", label: "Customers", href: "/dashboard/customers", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
+  { icon: Package, iconColor: "text-violet-600", label: "Products & Services", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: FileText, iconColor: "text-sky-600", label: "Quotations", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: ShoppingCart, iconColor: "text-orange-600", label: "Orders", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: WalletCards, iconColor: "text-indigo-600", label: "Invoices", href: "/dashboard/receipts", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: Receipt, iconColor: "text-rose-600", label: "Receipts", href: "/dashboard/receipts", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: CreditCard, iconColor: "text-cyan-600", label: "Payments", href: "/dashboard/payments", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: BarChart3, iconColor: "text-lime-600", label: "Reports", href: "/dashboard/reports", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
+  { icon: PackageSearch, iconColor: "text-fuchsia-600", label: "Inventory", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: Truck, iconColor: "text-amber-600", label: "Suppliers", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: Building2, iconColor: "text-stone-700", label: "Company Profile", href: "/dashboard/settings", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: UserCog, iconColor: "text-purple-600", label: "Users", href: "/dashboard/employees", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: Landmark, iconColor: "text-teal-600", label: "Payment Setup", href: "/dashboard/payment-setup", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: Settings, iconColor: "text-blue-500", label: "Integrations", href: "/dashboard/payment-setup", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: Settings, iconColor: "text-neutral-700", label: "Settings", href: "/dashboard/settings", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: Activity, iconColor: "text-red-600", label: "Activity Logs", href: "/dashboard/notifications", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: LifeBuoy, iconColor: "text-green-600", label: "Support", href: "/dashboard/notifications", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: CalendarCheck, iconColor: "text-yellow-600", label: "Follow-Ups", href: "/dashboard/followups", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: Landmark, iconColor: "text-pink-600", label: "Reconciliation", href: "/dashboard/reconciliation", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
+  { icon: BellRing, iconColor: "text-red-500", label: "Notifications", href: "/dashboard/notifications", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
 ]
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -168,7 +168,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                       : "text-muted-foreground hover:bg-accent hover:text-foreground"
                   )}
                 >
-                  <item.icon size={20} strokeWidth={1.8} className="shrink-0" />
+                  <item.icon size={20} strokeWidth={1.8} className={cn("shrink-0", item.iconColor)} />
                   {!collapsed && <span className="truncate">{item.label}</span>}
                 </Link>
               )
@@ -225,11 +225,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 href="/dashboard/quotations/new"
                 className="hidden h-10 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-all duration-200 hover:-translate-y-px hover:bg-primary/90 sm:inline-flex"
               >
-                <Plus size={18} />
+                <Plus size={18} className="text-white" />
                 <span>New</span>
               </Link>
               <button type="button" aria-label="Help" className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-                <CircleHelp size={20} />
+                <CircleHelp size={20} className="text-blue-600" />
               </button>
               <button
                 type="button"
@@ -237,14 +237,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 onClick={toggleTheme}
                 className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
-                {resolvedTheme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+                {resolvedTheme === "dark" ? <Sun size={20} className="text-amber-500" /> : <Moon size={20} className="text-indigo-600" />}
               </button>
               <Link href="/dashboard/notifications" aria-label="Notifications" className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-                <Bell size={20} />
+                <Bell size={20} className="text-red-500" />
                 <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />
               </Link>
               <button className="hidden items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent sm:flex">
-                <Building2 size={18} />
+                <Building2 size={18} className="text-emerald-600" />
                 <span className="max-w-24 truncate">Company</span>
                 <ChevronDown size={16} className="text-muted-foreground" />
               </button>
