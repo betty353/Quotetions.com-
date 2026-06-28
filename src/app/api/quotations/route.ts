@@ -29,6 +29,8 @@ export async function GET(request: NextRequest) {
     where.customerId = customer.id
   } else if (sessionCompanyId) {
     where.companyId = sessionCompanyId
+  } else {
+    return NextResponse.json({ error: "Company workspace required" }, { status: 400 })
   }
 
   const total = await prisma.quotation.count({ where })

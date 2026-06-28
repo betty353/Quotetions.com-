@@ -82,6 +82,7 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
       const res = await fetch("/api/quotations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(payload),
       })
 

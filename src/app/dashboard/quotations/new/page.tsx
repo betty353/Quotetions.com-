@@ -16,12 +16,35 @@ export default async function NewQuotationPage({ searchParams }: NewQuotationPag
 
   const role = (session.user as any).role
   const sessionCompanyId = (session.user as any).companyId as string | null
-  const customer = role === "CUSTOMER"
+  let customer = role === "CUSTOMER"
     ? await prisma.customer.findUnique({ where: { userId: session.user.id } })
     : null
   const storeCompany = resolvedSearchParams.companySlug
     ? await prisma.company.findUnique({ where: { slug: resolvedSearchParams.companySlug }, select: { id: true, slug: true, name: true } })
     : null
+
+  if (role === "CUSTOMER" && customer && !customer.companyId && storeCompany) {
+    const [updatedCustomer] = await prisma.$transaction([
+      prisma.customer.update({
+        where: { id: customer.id },
+        data: { companyId: storeCompany.id },
+      }),
+      prisma.user.update({
+        where: { id: session.user.id },
+        data: { companyId: storeCompany.id },
+      }),
+    ])
+    customer = updatedCustomer
+  }
+
+  if (role === "CUSTOMER" && customer?.companyId && storeCompany && customer.companyId !== storeCompany.id) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-800">
+        This customer account is already connected to another company. Please create a customer account from this store link using a different email address.
+      </div>
+    )
+  }
+
   const targetCompanyId = role === "CUSTOMER"
     ? customer?.companyId || storeCompany?.id || null
     : sessionCompanyId
