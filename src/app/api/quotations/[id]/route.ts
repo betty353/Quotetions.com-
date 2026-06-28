@@ -16,6 +16,7 @@ export async function GET(
   const quotation = await prisma.quotation.findUnique({
     where: { id },
     include: {
+      company: { include: { settings: true } },
       customer: true,
       createdBy: true,
       assignedEmployee: true,
