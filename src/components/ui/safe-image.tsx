@@ -1,14 +1,13 @@
-import Image, { type ImageProps } from "next/image"
+import type { ImgHTMLAttributes } from "react"
 
-const passthroughLoader: ImageProps["loader"] = ({ src }) => src
+type SafeImageProps = ImgHTMLAttributes<HTMLImageElement> & {
+  src: string
+  alt: string
+  width?: number | string
+  height?: number | string
+}
 
-export default function SafeImage({ alt, ...props }: ImageProps) {
-  return (
-    <Image
-      {...props}
-      alt={alt}
-      loader={passthroughLoader}
-      unoptimized
-    />
-  )
+export default function SafeImage({ alt, loading = "lazy", decoding = "async", ...props }: SafeImageProps) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img {...props} alt={alt} loading={loading} decoding={decoding} />
 }
