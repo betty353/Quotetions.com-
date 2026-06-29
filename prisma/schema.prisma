@@ -347,8 +347,19 @@ model InternalChatMessage {
   senderId              String
   recipientId           String?
   message               String    @db.Text
+  replyToId             String?
+  attachmentUrl         String?
+  attachmentName        String?
+  attachmentType        String?
+  linkType              String?
+  linkId                String?
+  linkLabel             String?
+  isPinned              Boolean   @default(false)
   isRead                Boolean   @default(false)
   readAt                DateTime?
+  editedAt              DateTime?
+  deletedAt             DateTime?
+  deletedById           String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -359,7 +370,40 @@ model InternalChatMessage {
   @@index([companyId])
   @@index([senderId])
   @@index([recipientId])
+  @@index([replyToId])
+  @@index([isPinned])
   @@index([createdAt])
+}
+
+model InternalChatPresence {
+  id                    String    @id @default(cuid())
+  companyId             String
+  userId                String
+  lastSeenAt            DateTime  @default(now())
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([companyId, userId])
+  @@index([companyId])
+  @@index([userId])
+  @@index([lastSeenAt])
+}
+
+model InternalChatTyping {
+  id                    String    @id @default(cuid())
+  companyId             String
+  userId                String
+  channel               String
+  recipientId           String?
+  expiresAt             DateTime
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([companyId, userId, channel])
+  @@index([companyId])
+  @@index([userId])
+  @@index([channel])
+  @@index([expiresAt])
 }
 
 model ProductStockMovement {

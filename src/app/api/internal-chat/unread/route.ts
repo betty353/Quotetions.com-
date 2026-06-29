@@ -20,11 +20,11 @@ export async function GET() {
 
   const [team, directRows] = await Promise.all([
     prisma.internalChatMessage.count({
-      where: { companyId, recipientId: null, senderId: { not: userId }, isRead: false },
+      where: { companyId, recipientId: null, senderId: { not: userId }, isRead: false, deletedAt: null },
     }),
     prisma.internalChatMessage.groupBy({
       by: ["senderId"],
-      where: { companyId, recipientId: userId, isRead: false },
+      where: { companyId, recipientId: userId, isRead: false, deletedAt: null },
       _count: { _all: true },
     }),
   ])

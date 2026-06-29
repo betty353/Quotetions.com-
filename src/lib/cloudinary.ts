@@ -41,4 +41,24 @@ export async function uploadImageFromBase64(base64Image: string, folder = "quote
   return res
 }
 
+export async function uploadFileFromBase64(base64File: string, folder = "quotetion/chat") {
+  if (!process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    throw new Error("Cloudinary credentials not configured")
+  }
+
+  if (!base64File.startsWith("data:")) {
+    throw new Error("base64File must be a valid data URI")
+  }
+
+  const res = await cloudinary.uploader.upload(base64File, {
+    folder,
+    resource_type: "auto",
+    use_filename: true,
+    unique_filename: true,
+    overwrite: false,
+  })
+
+  return res
+}
+
 export default cloudinary

@@ -4,13 +4,43 @@ import { prisma } from "@/lib/prisma"
 import requireRole from "@/lib/roles"
 import { isCompanyAdminRole } from "@/lib/tenant"
 
-const chatMessageSchema = z.object({
-  message: z.string().trim().min(1, "Message is required").max(2000, "Message is too long"),
+const sendMessageSchema = z.object({
+  message: z.string().trim().max(2000, "Message is too long").optional().default(""),
   recipientId: z.string().optional().nullable(),
+  replyToId: z.string().optional().nullable(),
+  attachmentUrl: z.string().url().optional().nullable(),
+  attachmentName: z.string().max(180).optional().nullable(),
+  attachmentType: z.string().max(120).optional().nullable(),
+  linkType: z.enum(["CUSTOMER", "QUOTATION", "PRODUCT", "INVOICE", "RECEIPT"]).optional().nullable(),
+  linkId: z.string().optional().nullable(),
+  linkLabel: z.string().max(180).optional().nullable(),
+}).refine((value) => value.message || value.attachmentUrl || value.linkId, {
+  message: "Message, attachment, or shared record is required",
 })
+
+const patchSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("edit"), id: z.string(), message: z.string().trim().min(1).max(2000) }),
+  z.object({ action: z.literal("delete"), id: z.string() }),
+  z.object({ action: z.literal("pin"), id: z.string(), isPinned: z.boolean() }),
+])
 
 function canUseInternalChat(role?: string | null) {
   return role === "EMPLOYEE" || isCompanyAdminRole(role)
+}
+
+function channelFor(recipientId?: string | null) {
+  return recipientId ? `direct:${recipientId}` : "team"
+}
+
+async function requireChatSession() {
+  const session = await requireRole("ADMIN", "EMPLOYEE")
+  if (!session) return null
+  const role = (session.user as any).role as string
+  if (!canUseInternalChat(role)) return null
+  const companyId = (session.user as any).companyId as string | null
+  const userId = (session.user as any).id as string
+  if (!companyId || !userId) return null
+  return { session, role, companyId, userId }
 }
 
 async function getCompanyChatUsers(companyId: string) {
@@ -25,14 +55,22 @@ async function getCompanyChatUsers(companyId: string) {
   })
 }
 
+async function touchPresence(companyId: string, userId: string) {
+  await prisma.internalChatPresence.upsert({
+    where: { companyId_userId: { companyId, userId } },
+    create: { companyId, userId, lastSeenAt: new Date() },
+    update: { lastSeenAt: new Date() },
+  })
+}
+
 async function getUnreadSummary(companyId: string, userId: string) {
   const [team, directRows] = await Promise.all([
     prisma.internalChatMessage.count({
-      where: { companyId, recipientId: null, senderId: { not: userId }, isRead: false },
+      where: { companyId, recipientId: null, senderId: { not: userId }, isRead: false, deletedAt: null },
     }),
     prisma.internalChatMessage.groupBy({
       by: ["senderId"],
-      where: { companyId, recipientId: userId, isRead: false },
+      where: { companyId, recipientId: userId, isRead: false, deletedAt: null },
       _count: { _all: true },
     }),
   ])
@@ -49,25 +87,96 @@ async function getUnreadSummary(companyId: string, userId: string) {
   }
 }
 
+async function getReplyMap(messages: Array<{ replyToId: string | null }>) {
+  const replyIds = Array.from(new Set(messages.map((message) => message.replyToId).filter(Boolean))) as string[]
+  if (replyIds.length === 0) return {}
+
+  const replies = await prisma.internalChatMessage.findMany({
+    where: { id: { in: replyIds } },
+    select: {
+      id: true,
+      message: true,
+      attachmentName: true,
+      linkLabel: true,
+      deletedAt: true,
+      sender: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+    },
+  })
+
+  return replies.reduce<Record<string, unknown>>((acc, reply) => {
+    acc[reply.id] = reply
+    return acc
+  }, {})
+}
+
+async function getLinkables(companyId: string) {
+  const [customers, quotations, products] = await Promise.all([
+    prisma.customer.findMany({
+      where: { companyId, status: "ACTIVE" },
+      take: 30,
+      orderBy: { updatedAt: "desc" },
+      include: { user: true },
+    }),
+    prisma.quotation.findMany({
+      where: { companyId },
+      take: 30,
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, quotationNumber: true, total: true, currency: true, status: true },
+    }),
+    prisma.product.findMany({
+      where: { companyId, status: "ACTIVE" },
+      take: 30,
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, name: true, sku: true, unitPrice: true, currency: true },
+    }),
+  ])
+
+  return [
+    ...customers.map((customer) => ({
+      type: "CUSTOMER",
+      id: customer.id,
+      label: customer.companyName || customer.contactPerson || `${customer.user.firstName} ${customer.user.lastName}`.trim() || customer.user.email,
+      href: `/dashboard/customers/${customer.id}`,
+    })),
+    ...quotations.map((quotation) => ({
+      type: "QUOTATION",
+      id: quotation.id,
+      label: `${quotation.quotationNumber} - ${quotation.status}`,
+      href: `/dashboard/quotations/${quotation.id}`,
+    })),
+    ...products.map((product) => ({
+      type: "PRODUCT",
+      id: product.id,
+      label: `${product.name}${product.sku ? ` (${product.sku})` : ""}`,
+      href: `/dashboard/products/${product.id}`,
+    })),
+  ]
+}
+
+async function assertLinkedRecord(companyId: string, linkType?: string | null, linkId?: string | null) {
+  if (!linkType || !linkId) return true
+  if (linkType === "CUSTOMER") return Boolean(await prisma.customer.findFirst({ where: { id: linkId, companyId }, select: { id: true } }))
+  if (linkType === "QUOTATION") return Boolean(await prisma.quotation.findFirst({ where: { id: linkId, companyId }, select: { id: true } }))
+  if (linkType === "PRODUCT") return Boolean(await prisma.product.findFirst({ where: { id: linkId, companyId }, select: { id: true } }))
+  return true
+}
+
 export async function GET(request: NextRequest) {
-  const session = await requireRole("ADMIN", "EMPLOYEE")
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireChatSession()
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const role = (session.user as any).role as string
-  if (!canUseInternalChat(role)) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
-
-  const companyId = (session.user as any).companyId as string | null
-  const userId = (session.user as any).id as string
-  if (!companyId || !userId) return NextResponse.json({ error: "Company workspace is required" }, { status: 400 })
+  const { companyId, userId } = auth
+  await touchPresence(companyId, userId)
 
   const recipientId = request.nextUrl.searchParams.get("recipientId") || null
+  const search = request.nextUrl.searchParams.get("q")?.trim() || ""
   const users = await getCompanyChatUsers(companyId)
 
   if (recipientId && !users.some((user) => user.id === recipientId)) {
     return NextResponse.json({ error: "Recipient not found" }, { status: 404 })
   }
 
-  const where = recipientId
+  const baseWhere = recipientId
     ? {
         companyId,
         OR: [
@@ -77,10 +186,14 @@ export async function GET(request: NextRequest) {
       }
     : { companyId, recipientId: null }
 
+  const where = search
+    ? { ...baseWhere, deletedAt: null, message: { contains: search, mode: "insensitive" as const } }
+    : baseWhere
+
   const messages = await prisma.internalChatMessage.findMany({
     where,
     orderBy: { createdAt: "asc" },
-    take: 200,
+    take: 250,
     include: {
       sender: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
       recipient: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
@@ -89,39 +202,70 @@ export async function GET(request: NextRequest) {
 
   await prisma.internalChatMessage.updateMany({
     where: recipientId
-      ? { companyId, senderId: recipientId, recipientId: userId, isRead: false }
-      : { companyId, recipientId: null, senderId: { not: userId }, isRead: false },
+      ? { companyId, senderId: recipientId, recipientId: userId, isRead: false, deletedAt: null }
+      : { companyId, recipientId: null, senderId: { not: userId }, isRead: false, deletedAt: null },
     data: { isRead: true, readAt: new Date() },
   })
 
-  const unread = await getUnreadSummary(companyId, userId)
+  const channel = recipientId ? channelFor(userId) : "team"
+  const now = new Date()
+  await prisma.internalChatTyping.deleteMany({ where: { expiresAt: { lt: now } } })
+
+  const [unread, replyMap, presences, typing, pinnedMessages, linkables] = await Promise.all([
+    getUnreadSummary(companyId, userId),
+    getReplyMap(messages),
+    prisma.internalChatPresence.findMany({ where: { companyId }, select: { userId: true, lastSeenAt: true } }),
+    prisma.internalChatTyping.findMany({
+      where: { companyId, channel, userId: { not: userId }, expiresAt: { gt: now } },
+      select: { userId: true },
+    }),
+    prisma.internalChatMessage.findMany({
+      where: { ...baseWhere, isPinned: true, deletedAt: null },
+      orderBy: { updatedAt: "desc" },
+      take: 8,
+      include: {
+        sender: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+      },
+    }),
+    getLinkables(companyId),
+  ])
 
   return NextResponse.json({
     users,
-    messages,
+    messages: messages.map((message) => ({ ...message, replyTo: message.replyToId ? replyMap[message.replyToId] || null : null })),
+    pinnedMessages,
     unread,
+    presences,
+    typingUserIds: typing.map((item) => item.userId),
+    linkables,
   })
 }
 
 export async function POST(request: NextRequest) {
-  const session = await requireRole("ADMIN", "EMPLOYEE")
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireChatSession()
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const role = (session.user as any).role as string
-  if (!canUseInternalChat(role)) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
-
-  const companyId = (session.user as any).companyId as string | null
-  const senderId = (session.user as any).id as string
-  if (!companyId || !senderId) return NextResponse.json({ error: "Company workspace is required" }, { status: 400 })
+  const { companyId, userId: senderId } = auth
+  await touchPresence(companyId, senderId)
 
   const body = await request.json().catch(() => ({}))
-  const parsed = chatMessageSchema.safeParse(body)
+  const parsed = sendMessageSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.errors }, { status: 400 })
 
-  const recipientId = parsed.data.recipientId || null
+  const input = parsed.data
+  const recipientId = input.recipientId || null
   const users = await getCompanyChatUsers(companyId)
   if (recipientId && !users.some((user) => user.id === recipientId && user.id !== senderId)) {
     return NextResponse.json({ error: "Recipient not found" }, { status: 404 })
+  }
+
+  if (input.replyToId) {
+    const reply = await prisma.internalChatMessage.findFirst({ where: { id: input.replyToId, companyId }, select: { id: true } })
+    if (!reply) return NextResponse.json({ error: "Reply message not found" }, { status: 404 })
+  }
+
+  if (!(await assertLinkedRecord(companyId, input.linkType, input.linkId))) {
+    return NextResponse.json({ error: "Shared record not found" }, { status: 404 })
   }
 
   const message = await prisma.internalChatMessage.create({
@@ -129,7 +273,14 @@ export async function POST(request: NextRequest) {
       companyId,
       senderId,
       recipientId,
-      message: parsed.data.message,
+      message: input.message || "",
+      replyToId: input.replyToId || null,
+      attachmentUrl: input.attachmentUrl || null,
+      attachmentName: input.attachmentName || null,
+      attachmentType: input.attachmentType || null,
+      linkType: input.linkType || null,
+      linkId: input.linkId || null,
+      linkLabel: input.linkLabel || null,
     },
     include: {
       sender: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
@@ -138,16 +289,17 @@ export async function POST(request: NextRequest) {
   })
 
   const senderName = `${message.sender.firstName} ${message.sender.lastName}`.trim() || message.sender.email
+  const preview = input.message || input.attachmentName || input.linkLabel || "Sent an attachment"
   const notificationUsers = recipientId ? [recipientId] : users.filter((user) => user.id !== senderId).map((user) => user.id)
 
   if (notificationUsers.length > 0) {
     await prisma.notification.createMany({
-      data: notificationUsers.map((userId) => ({
+      data: notificationUsers.map((notifyUserId) => ({
         companyId,
-        userId,
+        userId: notifyUserId,
         type: "SYSTEM_ALERT",
         title: recipientId ? "New direct chat message" : "New team chat message",
-        message: `${senderName}: ${parsed.data.message.slice(0, 140)}`,
+        message: `${senderName}: ${preview.slice(0, 140)}`,
         relatedId: message.id,
         relatedModel: "InternalChatMessage",
       })),
@@ -155,4 +307,42 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ data: message }, { status: 201 })
+}
+
+export async function PATCH(request: NextRequest) {
+  const auth = await requireChatSession()
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const { companyId, userId, role } = auth
+  const body = await request.json().catch(() => ({}))
+  const parsed = patchSchema.safeParse(body)
+  if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.errors }, { status: 400 })
+
+  const existing = await prisma.internalChatMessage.findFirst({ where: { id: parsed.data.id, companyId } })
+  if (!existing) return NextResponse.json({ error: "Message not found" }, { status: 404 })
+
+  if (parsed.data.action === "edit") {
+    if (existing.senderId !== userId || existing.deletedAt) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+    const updated = await prisma.internalChatMessage.update({
+      where: { id: existing.id },
+      data: { message: parsed.data.message, editedAt: new Date() },
+    })
+    return NextResponse.json({ data: updated })
+  }
+
+  if (parsed.data.action === "delete") {
+    if (existing.senderId !== userId && !isCompanyAdminRole(role)) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+    const updated = await prisma.internalChatMessage.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date(), deletedById: userId, isPinned: false },
+    })
+    return NextResponse.json({ data: updated })
+  }
+
+  if (existing.senderId !== userId && !isCompanyAdminRole(role)) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+  const updated = await prisma.internalChatMessage.update({
+    where: { id: existing.id },
+    data: { isPinned: parsed.data.isPinned },
+  })
+  return NextResponse.json({ data: updated })
 }
