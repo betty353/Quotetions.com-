@@ -117,6 +117,8 @@ model User {
   productImportHistories ProductImportHistory[]
   productStockMovements ProductStockMovement[]
   productViews          ProductView[]
+  sentInternalMessages  InternalChatMessage[] @relation("InternalChatMessageSender")
+  receivedInternalMessages InternalChatMessage[] @relation("InternalChatMessageRecipient")
   passwordResetTokens   PasswordResetToken[]
 
   @@index([email])
@@ -155,6 +157,7 @@ model Company {
   productImportHistories ProductImportHistory[]
   productStockMovements ProductStockMovement[]
   productViews          ProductView[]
+  internalChatMessages  InternalChatMessage[]
   quotations            Quotation[]
   payments              Payment[]
   receipts              Receipt[]
@@ -335,6 +338,27 @@ model ProductView {
   @@index([companyId])
   @@index([productId])
   @@index([userId])
+  @@index([createdAt])
+}
+
+model InternalChatMessage {
+  id                    String    @id @default(cuid())
+  companyId             String?
+  senderId              String
+  recipientId           String?
+  message               String    @db.Text
+  isRead                Boolean   @default(false)
+  readAt                DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sender                User      @relation("InternalChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient             User?     @relation("InternalChatMessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([senderId])
+  @@index([recipientId])
   @@index([createdAt])
 }
 
