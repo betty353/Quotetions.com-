@@ -25,6 +25,30 @@ async function getCompanyChatUsers(companyId: string) {
   })
 }
 
+async function getUnreadSummary(companyId: string, userId: string) {
+  const [team, directRows] = await Promise.all([
+    prisma.internalChatMessage.count({
+      where: { companyId, recipientId: null, senderId: { not: userId }, isRead: false },
+    }),
+    prisma.internalChatMessage.groupBy({
+      by: ["senderId"],
+      where: { companyId, recipientId: userId, isRead: false },
+      _count: { _all: true },
+    }),
+  ])
+
+  const directByUserId = directRows.reduce<Record<string, number>>((acc, row) => {
+    acc[row.senderId] = row._count._all
+    return acc
+  }, {})
+
+  return {
+    total: team + directRows.reduce((sum, row) => sum + row._count._all, 0),
+    team,
+    directByUserId,
+  }
+}
+
 export async function GET(request: NextRequest) {
   const session = await requireRole("ADMIN", "EMPLOYEE")
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -70,9 +94,12 @@ export async function GET(request: NextRequest) {
     data: { isRead: true, readAt: new Date() },
   })
 
+  const unread = await getUnreadSummary(companyId, userId)
+
   return NextResponse.json({
     users,
     messages,
+    unread,
   })
 }
 

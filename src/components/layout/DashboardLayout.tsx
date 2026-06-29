@@ -40,6 +40,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/components/providers/ThemeProvider"
 import NotificationBell from "@/components/notifications/NotificationBell"
+import ChatUnreadBadge from "@/components/chat/ChatUnreadBadge"
 
 const sidebarItems = [
   { icon: BarChart3, iconColor: "text-blue-600", label: "Dashboard", href: "/dashboard", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
@@ -163,7 +164,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   title={collapsed ? item.label : undefined}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
-                    "group flex h-10 items-center rounded-xl px-3 text-sm font-medium transition-all duration-150",
+                    "group relative flex h-10 items-center rounded-xl px-3 text-sm font-medium transition-all duration-150",
                     collapsed ? "justify-center gap-0" : "gap-3",
                     isActive
                       ? "bg-surface-selected text-foreground shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]"
@@ -172,6 +173,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 >
                   <item.icon size={20} strokeWidth={1.8} className={cn("shrink-0", item.iconColor)} />
                   {!collapsed && <span className="truncate">{item.label}</span>}
+                  {item.href === "/dashboard/chat" && <ChatUnreadBadge compact={collapsed} />}
                 </Link>
               )
             })}

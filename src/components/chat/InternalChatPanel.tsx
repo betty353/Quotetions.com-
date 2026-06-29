@@ -27,6 +27,12 @@ type InternalChatPanelProps = {
   initialUsers: ChatUser[]
 }
 
+type ChatUnreadSummary = {
+  total: number
+  team: number
+  directByUserId: Record<string, number>
+}
+
 function displayName(user: ChatUser) {
   return `${user.firstName} ${user.lastName}`.trim() || user.email
 }
@@ -48,6 +54,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState("")
+  const [unread, setUnread] = useState<ChatUnreadSummary>({ total: 0, team: 0, directByUserId: {} })
   const endRef = useRef<HTMLDivElement>(null)
 
   const directUsers = useMemo(() => users.filter((user) => user.id !== currentUserId), [currentUserId, users])
@@ -68,6 +75,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
     const json = await res.json()
     setUsers(json.users || [])
     setMessages(json.messages || [])
+    setUnread(json.unread || { total: 0, team: 0, directByUserId: {} })
     setError("")
     setLoading(false)
   }
@@ -132,6 +140,11 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
               <span className="block text-sm font-semibold">Team room</span>
               <span className={`block truncate text-xs ${recipientId === "" ? "text-white/70" : "text-muted-foreground"}`}>Everyone in admin and worker roles</span>
             </span>
+            {unread.team > 0 && recipientId !== "" && (
+              <span className="ml-auto flex h-6 min-w-6 items-center justify-center rounded-full bg-red-600 px-2 text-xs font-bold text-white">
+                {unread.team > 9 ? "9+" : unread.team}
+              </span>
+            )}
           </button>
 
           <div className="mt-4 space-y-1">
@@ -153,6 +166,11 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
                     <span className="block truncate text-sm font-semibold">{displayName(user)}</span>
                     <span className="block truncate text-xs text-muted-foreground">{user.role}</span>
                   </span>
+                  {(unread.directByUserId[user.id] || 0) > 0 && recipientId !== user.id && (
+                    <span className="ml-auto flex h-6 min-w-6 items-center justify-center rounded-full bg-red-600 px-2 text-xs font-bold text-white">
+                      {unread.directByUserId[user.id] > 9 ? "9+" : unread.directByUserId[user.id]}
+                    </span>
+                  )}
                 </button>
               ))
             )}
