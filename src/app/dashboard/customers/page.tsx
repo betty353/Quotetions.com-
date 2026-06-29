@@ -5,8 +5,8 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { formatCurrency, formatDate } from "@/lib/utils"
-import { Users } from "lucide-react"
+import { formatCurrency } from "@/lib/utils"
+import { ArrowRight, Users } from "lucide-react"
 import { isCompanyAdminRole } from "@/lib/tenant"
 
 export default async function CustomersPage() {
@@ -31,10 +31,6 @@ export default async function CustomersPage() {
         },
         orderBy: { createdAt: "desc" },
       },
-      followUps: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
     },
   })
 
@@ -45,7 +41,6 @@ export default async function CustomersPage() {
       0
     )
     const latestQuotation = customer.quotations[0]
-    const latestFollowUp = customer.followUps[0]
 
     return {
       customer,
@@ -54,7 +49,6 @@ export default async function CustomersPage() {
       outstanding: Math.max(0, quoted - paid),
       quotationCount: customer.quotations.length,
       latestQuotation,
-      latestFollowUp,
     }
   })
 
@@ -97,7 +91,7 @@ export default async function CustomersPage() {
       <Card>
         <CardHeader>
           <CardTitle>Customer Ledger</CardTitle>
-          <CardDescription>Financial position and last touch for each customer.</CardDescription>
+          <CardDescription>Clean customer list with financial position. Open a customer to view contact details, follow-ups, and activity.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {rows.length === 0 ? (
@@ -110,28 +104,22 @@ export default async function CustomersPage() {
               <thead className="border-b border-slate-200 text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Customer</th>
-                  <th className="px-4 py-3">Contact</th>
                   <th className="px-4 py-3">Quotations</th>
                   <th className="px-4 py-3">Quoted</th>
                   <th className="px-4 py-3">Paid</th>
                   <th className="px-4 py-3">Outstanding</th>
                   <th className="px-4 py-3">Last Quotation</th>
-                  <th className="px-4 py-3">Follow-Up</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Open</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ customer, quotationCount, quoted, paid, outstanding, latestQuotation, latestFollowUp }) => (
+                {rows.map(({ customer, quotationCount, quoted, paid, outstanding, latestQuotation }) => (
                   <tr key={customer.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-3">
                       <Link href={`/dashboard/customers/${customer.id}`} className="font-medium text-foreground underline-offset-4 hover:underline">
                         {customer.companyName || customer.contactPerson || `${customer.user.firstName} ${customer.user.lastName}`}
                       </Link>
-                      <div className="text-xs text-slate-500">{customer.user.email}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div>{customer.phone || customer.user.phone || "-"}</div>
-                      <div className="text-xs text-slate-500">{customer.city || customer.region || customer.country || ""}</div>
                     </td>
                     <td className="px-4 py-3">{quotationCount}</td>
                     <td className="px-4 py-3">{formatCurrency(quoted)}</td>
@@ -145,10 +133,12 @@ export default async function CustomersPage() {
                       ) : "-"}
                     </td>
                     <td className="px-4 py-3">
-                      {latestFollowUp?.nextFollowUpDate ? formatDate(latestFollowUp.nextFollowUpDate) : "None"}
-                    </td>
-                    <td className="px-4 py-3">
                       <Badge variant={customer.status === "ACTIVE" ? "success" : "warning"}>{customer.status}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link href={`/dashboard/customers/${customer.id}`} className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-input bg-card px-3 text-xs font-medium transition-all hover:-translate-y-px hover:bg-accent">
+                        Open <ArrowRight className="h-4 w-4" />
+                      </Link>
                     </td>
                   </tr>
                 ))}

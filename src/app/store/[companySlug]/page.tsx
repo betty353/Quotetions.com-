@@ -261,7 +261,7 @@ export default async function StorePage({ params, searchParams }: StorePageProps
             </Link>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
             {company.products.map((product) => (
               <StoreProductCard key={product.id} product={product} currency={currency} customerCta={customerCta} companySlug={company.slug} />
             ))}
@@ -282,42 +282,69 @@ function InfoRow({ icon, label }: { icon: ReactNode; label: string }) {
 }
 
 function StoreProductCard({ product, currency, customerCta, companySlug }: { product: any; currency: string; customerCta: string; companySlug: string }) {
-  const productImage = safeImageSrc(product.image)
+  const gallery = Array.isArray(product.images) ? product.images.filter((image: unknown): image is string => typeof image === "string") : []
+  const productImage = safeImageSrc(product.image) || safeImageSrc(gallery[0])
+  const thumbnails = [product.image, ...gallery].map((image) => safeImageSrc(image)).filter(Boolean).slice(0, 4) as string[]
+  const inStock = Number(product.stock ?? 0) > 0
 
   return (
-    <Card className="group overflow-hidden bg-white transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(15,23,42,0.10)]">
-      <div className="relative aspect-[4/3] border-b bg-surface">
+    <Card className="group overflow-hidden bg-white transition-all duration-200 hover:-translate-y-1 hover:border-orange-200 hover:shadow-[0_14px_34px_rgba(15,23,42,0.12)]">
+      <Link href={`/store/${companySlug}/products/${product.id}`} className="relative block aspect-square border-b bg-white">
         {productImage ? (
-          <SafeImage src={productImage} alt={product.name} width={480} height={360} className="h-full w-full object-cover" />
+          <SafeImage src={productImage} alt={product.name} width={520} height={520} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
         ) : (
           <div className="flex h-full items-center justify-center bg-[linear-gradient(135deg,#fff7ed,#f8fafc)]">
             <PackageSearch className="h-12 w-12 text-orange-500" />
           </div>
         )}
-        <div className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-xs font-medium text-orange-700 shadow-sm">
+        <div className="absolute left-2 top-2 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-orange-700 shadow-sm">
           Ready to quote
         </div>
-      </div>
-      <CardContent className="space-y-3 p-4">
-        <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-200">{product.category?.name || "Catalog"}</Badge>
-        <div>
-          <Link href={`/store/${companySlug}/products/${product.id}`} className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 underline-offset-4 hover:underline">{product.name}</Link>
-          {product.description && <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">{product.description}</p>}
+        <div className={`absolute right-2 top-2 rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm ${inStock ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+          {inStock ? "In stock" : "Sold out"}
         </div>
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="text-xs text-muted-foreground">Unit price</p>
-            <p className="text-lg font-bold text-orange-700">{currency} {Number(product.unitPrice).toFixed(2)}</p>
+      </Link>
+      <CardContent className="space-y-3 p-3">
+        {thumbnails.length > 1 && (
+          <div className="grid grid-cols-4 gap-1">
+            {thumbnails.map((image, index) => (
+              <div key={`${image}-${index}`} className="aspect-square overflow-hidden rounded-md border bg-slate-50">
+                <SafeImage src={image} alt={`${product.name} preview ${index + 1}`} width={80} height={80} className="h-full w-full object-cover" />
+              </div>
+            ))}
           </div>
-          <p className="text-xs text-muted-foreground">Stock: {product.stock ?? 0}</p>
+        )}
+
+        <div className="space-y-1">
+          <Link href={`/store/${companySlug}/products/${product.id}`} className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-neutral-950 underline-offset-4 hover:underline">{product.name}</Link>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-200">{product.category?.name || "Catalog"}</Badge>
+            {product.isFeatured && <Badge className="bg-orange-50 text-orange-700 hover:bg-orange-100">Featured</Badge>}
+          </div>
         </div>
-        <Link
-          href={customerCta}
-          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-orange-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
-        >
-          <ShoppingCart className="h-4 w-4" />
-          Add to quotation
-        </Link>
+
+        <div>
+          <p className="text-xs text-muted-foreground">Unit price</p>
+          <p className="text-xl font-bold tracking-tight text-orange-700">{currency} {Number(product.unitPrice).toFixed(2)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">MOQ: 1 item | Available: {product.stock ?? 0}</p>
+        </div>
+
+        {product.description && <p className="line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">{product.description}</p>}
+
+        <div className="flex items-center gap-2 rounded-lg bg-orange-50 px-2.5 py-2 text-xs font-medium text-orange-800">
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">Verified company catalog</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Link href={`/store/${companySlug}/products/${product.id}`} className="inline-flex h-9 items-center justify-center rounded-lg border border-input bg-white px-3 text-xs font-semibold transition-colors hover:bg-accent">
+            Details
+          </Link>
+          <Link href={customerCta} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-orange-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-orange-700">
+            <ShoppingCart className="h-3.5 w-3.5" />
+            Quote
+          </Link>
+        </div>
       </CardContent>
     </Card>
   )
