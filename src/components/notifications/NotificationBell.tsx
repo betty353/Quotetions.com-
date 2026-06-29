@@ -24,6 +24,7 @@ type NotificationItem = {
 
 function notificationHref(notification: NotificationItem) {
   if (notification.relatedModel === "InternalChatMessage") return "/dashboard/chat"
+  if (notification.relatedModel === "DiscountRequest") return "/dashboard/discount-requests"
   if (notification.relatedModel === "Quotation" || notification.quotationId) {
     const quotationId = notification.quotationId || notification.relatedId
     return quotationId ? `/dashboard/quotations/${quotationId}` : "/dashboard/quotations"

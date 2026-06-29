@@ -25,7 +25,7 @@ const patchSchema = z.discriminatedUnion("action", [
 ])
 
 function canUseInternalChat(role?: string | null) {
-  return role === "EMPLOYEE" || isCompanyAdminRole(role)
+  return role === "EMPLOYEE" || role === "CUSTOMER" || isCompanyAdminRole(role)
 }
 
 function channelFor(recipientId?: string | null) {
@@ -33,7 +33,7 @@ function channelFor(recipientId?: string | null) {
 }
 
 async function requireChatSession() {
-  const session = await requireRole("ADMIN", "EMPLOYEE")
+  const session = await requireRole("ADMIN", "EMPLOYEE", "CUSTOMER")
   if (!session) return null
   const role = (session.user as any).role as string
   if (!canUseInternalChat(role)) return null
@@ -43,7 +43,37 @@ async function requireChatSession() {
   return { session, role, companyId, userId }
 }
 
-async function getCompanyChatUsers(companyId: string) {
+async function getCompanyChatUsers(companyId: string, viewerId?: string, role?: string) {
+  if (role === "CUSTOMER" && viewerId) {
+    const customer = await prisma.customer.findUnique({ where: { userId: viewerId }, select: { id: true } })
+    if (!customer) return []
+    const quotations = await prisma.quotation.findMany({
+      where: { customerId: customer.id, companyId },
+      select: {
+        createdById: true,
+        assignedEmployee: { select: { userId: true } },
+      },
+      take: 50,
+    })
+    const staffIds = Array.from(new Set([
+      ...quotations.map((quotation) => quotation.createdById),
+      ...quotations.map((quotation) => quotation.assignedEmployee?.userId).filter(Boolean),
+    ])) as string[]
+    if (staffIds.length > 0) {
+      const staff = await prisma.user.findMany({
+        where: { id: { in: staffIds }, companyId, isActive: true, role: { in: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] } },
+        select: { id: true, firstName: true, lastName: true, email: true, role: true },
+        orderBy: [{ role: "asc" }, { firstName: "asc" }],
+      })
+      if (staff.length > 0) return staff
+    }
+    return prisma.user.findMany({
+      where: { companyId, isActive: true, role: { in: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] } },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true },
+      orderBy: [{ role: "asc" }, { firstName: "asc" }],
+    })
+  }
+
   return prisma.user.findMany({
     where: {
       companyId,
@@ -63,11 +93,13 @@ async function touchPresence(companyId: string, userId: string) {
   })
 }
 
-async function getUnreadSummary(companyId: string, userId: string) {
+async function getUnreadSummary(companyId: string, userId: string, role?: string | null) {
   const [team, directRows] = await Promise.all([
-    prisma.internalChatMessage.count({
-      where: { companyId, recipientId: null, senderId: { not: userId }, isRead: false, deletedAt: null },
-    }),
+    role === "CUSTOMER"
+      ? Promise.resolve(0)
+      : prisma.internalChatMessage.count({
+          where: { companyId, recipientId: null, senderId: { not: userId }, isRead: false, deletedAt: null },
+        }),
     prisma.internalChatMessage.groupBy({
       by: ["senderId"],
       where: { companyId, recipientId: userId, isRead: false, deletedAt: null },
@@ -165,15 +197,29 @@ export async function GET(request: NextRequest) {
   const auth = await requireChatSession()
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { companyId, userId } = auth
+  const { companyId, userId, role } = auth
   await touchPresence(companyId, userId)
 
   const recipientId = request.nextUrl.searchParams.get("recipientId") || null
   const search = request.nextUrl.searchParams.get("q")?.trim() || ""
-  const users = await getCompanyChatUsers(companyId)
+  const users = await getCompanyChatUsers(companyId, userId, role)
 
   if (recipientId && !users.some((user) => user.id === recipientId)) {
     return NextResponse.json({ error: "Recipient not found" }, { status: 404 })
+  }
+
+  if (role === "CUSTOMER" && !recipientId) {
+    const unread = await getUnreadSummary(companyId, userId, role)
+    const presences = await prisma.internalChatPresence.findMany({ where: { companyId }, select: { userId: true, lastSeenAt: true } })
+    return NextResponse.json({
+      users,
+      messages: [],
+      pinnedMessages: [],
+      unread,
+      presences,
+      typingUserIds: [],
+      linkables: [],
+    })
   }
 
   const baseWhere = recipientId
@@ -212,7 +258,7 @@ export async function GET(request: NextRequest) {
   await prisma.internalChatTyping.deleteMany({ where: { expiresAt: { lt: now } } })
 
   const [unread, replyMap, presences, typing, pinnedMessages, linkables] = await Promise.all([
-    getUnreadSummary(companyId, userId),
+    getUnreadSummary(companyId, userId, role),
     getReplyMap(messages),
     prisma.internalChatPresence.findMany({ where: { companyId }, select: { userId: true, lastSeenAt: true } }),
     prisma.internalChatTyping.findMany({
@@ -227,7 +273,7 @@ export async function GET(request: NextRequest) {
         sender: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
       },
     }),
-    getLinkables(companyId),
+    role === "CUSTOMER" ? Promise.resolve([]) : getLinkables(companyId),
   ])
 
   return NextResponse.json({
@@ -245,7 +291,7 @@ export async function POST(request: NextRequest) {
   const auth = await requireChatSession()
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { companyId, userId: senderId } = auth
+  const { companyId, userId: senderId, role } = auth
   await touchPresence(companyId, senderId)
 
   const body = await request.json().catch(() => ({}))
@@ -254,7 +300,11 @@ export async function POST(request: NextRequest) {
 
   const input = parsed.data
   const recipientId = input.recipientId || null
-  const users = await getCompanyChatUsers(companyId)
+  if (role === "CUSTOMER" && !recipientId) {
+    return NextResponse.json({ error: "Choose a staff member to message" }, { status: 400 })
+  }
+
+  const users = await getCompanyChatUsers(companyId, senderId, role)
   if (recipientId && !users.some((user) => user.id === recipientId && user.id !== senderId)) {
     return NextResponse.json({ error: "Recipient not found" }, { status: 404 })
   }
@@ -262,6 +312,10 @@ export async function POST(request: NextRequest) {
   if (input.replyToId) {
     const reply = await prisma.internalChatMessage.findFirst({ where: { id: input.replyToId, companyId }, select: { id: true } })
     if (!reply) return NextResponse.json({ error: "Reply message not found" }, { status: 404 })
+  }
+
+  if (role === "CUSTOMER" && input.linkId) {
+    return NextResponse.json({ error: "Customers cannot share internal records" }, { status: 403 })
   }
 
   if (!(await assertLinkedRecord(companyId, input.linkType, input.linkId))) {

@@ -38,6 +38,11 @@ interface FormValues extends CreateQuotationInput {
 export default function QuotationForm({ products, customers, customerRole }: QuotationFormProps) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const isCustomer = customerRole === "CUSTOMER"
+  const isEmployee = customerRole === "EMPLOYEE"
+  const canApplyDiscount = ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"].includes(customerRole)
+  const canRequestDiscount = isEmployee
 
   const { register, control, handleSubmit, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(createQuotationSchema),
@@ -68,6 +73,7 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
 
   async function onSubmit(values: FormValues) {
     setError(null)
+    setSuccess(null)
 
     try {
       const validUntilValue = values.validUntil
@@ -92,6 +98,11 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
         return
       }
 
+      if ((data as any).discountRequest) {
+        setSuccess("Discount request sent to admin. The quotation will be created after approval.")
+        return
+      }
+
       router.push("/dashboard/quotations")
     } catch (err: any) {
       setError(err.message || "Unexpected error")
@@ -101,6 +112,7 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {success && <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">{success}</div>}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -126,7 +138,7 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
         <div className="flex items-center justify-between">
           <div>
             <Label>Quotation Items</Label>
-            <p className="text-xs text-muted-foreground">Add products, quantities, and discounts.</p>
+            <p className="text-xs text-muted-foreground">{isCustomer ? "Add products and quantities for your quotation request." : canApplyDiscount ? "Add products, quantities, and approved discounts." : "Add products and request admin approval for any discount."}</p>
           </div>
           <Button type="button" variant="secondary" onClick={() => append({ productId: products[0]?.id || "", quantity: 1, discount: 0 })}>
             Add Item
@@ -151,8 +163,15 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
               </div>
 
               <div>
-                <Label>Discount</Label>
-                <Input type="number" min="0" step="0.01" {...register(`items.${index}.discount` as const, { valueAsNumber: true })} />
+                <Label>{canRequestDiscount ? "Discount Request" : "Discount"}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  disabled={isCustomer || (!canApplyDiscount && !canRequestDiscount)}
+                  {...register(`items.${index}.discount` as const, { valueAsNumber: true })}
+                />
+                {isCustomer && <p className="mt-1 text-xs text-muted-foreground">Discounts are handled by the company.</p>}
               </div>
 
               <div className="flex items-end justify-end">

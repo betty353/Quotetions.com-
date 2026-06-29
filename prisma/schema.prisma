@@ -406,6 +406,35 @@ model InternalChatTyping {
   @@index([expiresAt])
 }
 
+model DiscountRequest {
+  id                    String    @id @default(cuid())
+  companyId             String?
+  customerId            String
+  requestedById         String
+  status                String    @default("PENDING")
+  items                 Json
+  notes                 String?   @db.Text
+  terms                 String?   @db.Text
+  validUntil            DateTime?
+  subtotal              Decimal   @db.Decimal(12, 2)
+  discountAmount        Decimal   @db.Decimal(12, 2)
+  total                 Decimal   @db.Decimal(12, 2)
+  approvedById          String?
+  approvedAt            DateTime?
+  rejectedById          String?
+  rejectedAt            DateTime?
+  rejectionReason       String?   @db.Text
+  quotationId           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([requestedById])
+  @@index([status])
+  @@index([createdAt])
+}
+
 model ProductStockMovement {
   id                    String    @id @default(cuid())
   companyId             String?

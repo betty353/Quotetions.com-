@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import DownloadQuotationPdf from "@/components/quotations/DownloadQuotationPdf"
+import { isCompanyAdminRole } from "@/lib/tenant"
 
 export default async function InvoicesPage() {
   const session = await getServerSession(authOptions)
@@ -15,13 +16,10 @@ export default async function InvoicesPage() {
 
   const role = (session.user as any).role
   const companyId = (session.user as any).companyId as string | null
+  if (!isCompanyAdminRole(role) && role !== "EMPLOYEE") redirect("/dashboard")
 
   const where: any = {}
-  if (role === "CUSTOMER") {
-    const customer = await prisma.customer.findUnique({ where: { userId: session.user.id } })
-    if (!customer) redirect("/dashboard")
-    where.customerId = customer.id
-  } else if (companyId) {
+  if (companyId) {
     where.companyId = companyId
   } else {
     redirect("/dashboard")

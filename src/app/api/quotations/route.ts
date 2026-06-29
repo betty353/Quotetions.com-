@@ -5,6 +5,7 @@ import requireRole from "@/lib/roles"
 import { generateQuotationNumber } from "@/lib/utils"
 import { ZodError } from "zod"
 import { createActivityLog, createAuditLog } from "@/lib/finance"
+import { isCompanyAdminRole } from "@/lib/tenant"
 
 export async function GET(request: NextRequest) {
   const session = await requireRole("ADMIN", "EMPLOYEE", "CUSTOMER")
@@ -66,6 +67,26 @@ export async function POST(request: NextRequest) {
       if (!customer) return NextResponse.json({ error: "Customer profile not found" }, { status: 404 })
       customerId = customer.id
       companyId = customer.companyId
+
+      const hasCompletedPayment = await prisma.payment.findFirst({
+        where: { customerId: customer.id, status: "COMPLETED" },
+        select: { id: true },
+      })
+      const openUnpaid = await prisma.quotation.count({
+        where: {
+          customerId: customer.id,
+          paymentStatus: { not: "COMPLETED" },
+          status: { in: ["DRAFT", "SENT", "VIEWED", "APPROVED"] },
+        },
+      })
+      const limit = hasCompletedPayment ? 5 : 2
+      if (openUnpaid >= limit) {
+        return NextResponse.json({
+          error: hasCompletedPayment
+            ? "Please complete or pay one of your open quotations before creating more requests."
+            : "Please wait for the company to respond or complete your first order before creating more quotation requests.",
+        }, { status: 403 })
+      }
     }
     if (!companyId) return NextResponse.json({ error: "Company context is required" }, { status: 400 })
 
@@ -86,7 +107,8 @@ export async function POST(request: NextRequest) {
 
       const quantity = Number(item.quantity)
       const unitPrice = Number(product.unitPrice)
-      const discount = Number(item.discount ?? 0)
+      const rawDiscount = Number(item.discount ?? 0)
+      const discount = role === "CUSTOMER" ? 0 : rawDiscount
       const subtotal = quantity * unitPrice
       const total = Math.max(0, subtotal - discount)
 
@@ -104,6 +126,58 @@ export async function POST(request: NextRequest) {
     const discountAmount = itemData.reduce((sum, item) => sum + item.discount, 0)
     const taxAmount = 0
     const totalAmount = itemData.reduce((sum, item) => sum + item.total, 0)
+
+    if (role === "EMPLOYEE" && discountAmount > 0) {
+      const request = await prisma.discountRequest.create({
+        data: {
+          companyId,
+          customerId,
+          requestedById: session.user.id,
+          status: "PENDING",
+          items: itemData,
+          notes: validated.notes || null,
+          terms: validated.terms || null,
+          validUntil: validated.validUntil || null,
+          subtotal,
+          discountAmount,
+          total: totalAmount,
+        },
+      })
+
+      const admins = await prisma.user.findMany({
+        where: { companyId, role: { in: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] }, isActive: true },
+        select: { id: true },
+      })
+      if (admins.length > 0) {
+        await prisma.notification.createMany({
+          data: admins.map((admin) => ({
+            companyId,
+            userId: admin.id,
+            type: "SYSTEM_ALERT",
+            title: "Discount approval needed",
+            message: `An employee requested a ${discountAmount.toFixed(2)} discount for a quotation.`,
+            relatedId: request.id,
+            relatedModel: "DiscountRequest",
+            customerId,
+          })),
+        })
+      }
+
+      await createAuditLog({
+        companyId,
+        userId: session.user.id,
+        action: "CREATE",
+        entity: "DiscountRequest",
+        entityId: request.id,
+        changes: { discountAmount, total: totalAmount },
+      })
+
+      return NextResponse.json({ discountRequest: true, data: request }, { status: 202 })
+    }
+
+    if (!isCompanyAdminRole(role) && discountAmount > 0) {
+      return NextResponse.json({ error: "Discounts require admin approval." }, { status: 403 })
+    }
     const setting = await prisma.companySetting.findUnique({ where: { companyId }, select: { quotationPrefix: true, defaultCurrency: true } })
     const count = await prisma.quotation.count({ where: { companyId } })
     const quotationNumber = generateQuotationNumber(setting?.quotationPrefix || "QT", count + 1)

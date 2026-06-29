@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { formatCurrency } from "@/lib/utils"
 import { ArrowRight, Users } from "lucide-react"
 import { isCompanyAdminRole } from "@/lib/tenant"
+import CreateCustomerForm from "@/components/customers/CreateCustomerForm"
 
 export default async function CustomersPage() {
   const session = await getServerSession(authOptions)
@@ -68,6 +69,8 @@ export default async function CustomersPage() {
         <h1 className="text-3xl font-bold">Customers</h1>
         <p className="text-sm text-muted-foreground mt-1">Customer accounts, balances, and recent quotation activity.</p>
       </div>
+
+      <CreateCustomerForm />
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>

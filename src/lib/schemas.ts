@@ -119,6 +119,26 @@ export const companySettingsSchema = z.object({
   documentFont: z.enum(["Helvetica", "Times", "Courier"]).default("Helvetica"),
 })
 
+export const staffCreateCustomerSchema = z.object({
+  firstName: z.string().trim().min(2, "First name is required"),
+  lastName: z.string().trim().min(2, "Last name is required"),
+  email: z.string().email("Valid email is required").transform((email) => email.trim().toLowerCase()),
+  phone: z.string().trim().min(6, "Phone is required"),
+  nrc: z.string().trim().optional(),
+  village: z.string().trim().optional(),
+  town: z.string().trim().optional(),
+  whatsappNumber: z.string().trim().optional(),
+  address: z.string().trim().optional(),
+  city: z.string().trim().optional(),
+  region: z.string().trim().optional(),
+  country: z.string().trim().optional(),
+})
+
+export const discountRequestDecisionSchema = z.object({
+  action: z.enum(["APPROVE", "REJECT"]),
+  rejectionReason: z.string().trim().optional(),
+})
+
 export const onboardingSchema = z.object({
   companyName: z.string().trim().min(1, "Company name is required"),
   companyEmail: z.string().email("Valid company email is required"),
@@ -230,6 +250,7 @@ export type CustomerRegistrationInput = z.infer<typeof customerRegistrationSchem
 export type CreateProductInput = z.infer<typeof createProductSchema>
 export type StockMovementInput = z.infer<typeof stockMovementSchema>
 export type CreateQuotationInput = z.infer<typeof createQuotationSchema>
+export type StaffCreateCustomerInput = z.infer<typeof staffCreateCustomerSchema>
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>
 export type CreateReceiptInput = z.infer<typeof createReceiptSchema>
 export type CreateFollowUpInput = z.infer<typeof createFollowUpSchema>

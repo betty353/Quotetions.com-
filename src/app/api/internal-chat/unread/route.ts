@@ -4,11 +4,11 @@ import requireRole from "@/lib/roles"
 import { isCompanyAdminRole } from "@/lib/tenant"
 
 function canUseInternalChat(role?: string | null) {
-  return role === "EMPLOYEE" || isCompanyAdminRole(role)
+  return role === "EMPLOYEE" || role === "CUSTOMER" || isCompanyAdminRole(role)
 }
 
 export async function GET() {
-  const session = await requireRole("ADMIN", "EMPLOYEE")
+  const session = await requireRole("ADMIN", "EMPLOYEE", "CUSTOMER")
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const role = (session.user as any).role as string
@@ -19,9 +19,11 @@ export async function GET() {
   if (!companyId || !userId) return NextResponse.json({ total: 0, team: 0, directByUserId: {} })
 
   const [team, directRows] = await Promise.all([
-    prisma.internalChatMessage.count({
-      where: { companyId, recipientId: null, senderId: { not: userId }, isRead: false, deletedAt: null },
-    }),
+    role === "CUSTOMER"
+      ? Promise.resolve(0)
+      : prisma.internalChatMessage.count({
+          where: { companyId, recipientId: null, senderId: { not: userId }, isRead: false, deletedAt: null },
+        }),
     prisma.internalChatMessage.groupBy({
       by: ["senderId"],
       where: { companyId, recipientId: userId, isRead: false, deletedAt: null },

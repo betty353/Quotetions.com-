@@ -59,6 +59,9 @@ type Presence = {
 type InternalChatPanelProps = {
   currentUserId: string
   initialUsers: ChatUser[]
+  userRole?: string
+  allowTeam?: boolean
+  initialRecipientId?: string
 }
 
 type ChatUnreadSummary = {
@@ -110,9 +113,9 @@ function readFileAsDataUrl(file: File) {
   })
 }
 
-export default function InternalChatPanel({ currentUserId, initialUsers }: InternalChatPanelProps) {
+export default function InternalChatPanel({ currentUserId, initialUsers, userRole, allowTeam = true, initialRecipientId = "" }: InternalChatPanelProps) {
   const [users, setUsers] = useState(initialUsers)
-  const [recipientId, setRecipientId] = useState<string>("")
+  const [recipientId, setRecipientId] = useState<string>(initialRecipientId)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [pinnedMessages, setPinnedMessages] = useState<ChatMessage[]>([])
   const [message, setMessage] = useState("")
@@ -135,6 +138,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
 
   const directUsers = useMemo(() => users.filter((user) => user.id !== currentUserId), [currentUserId, users])
   const activeUser = directUsers.find((user) => user.id === recipientId)
+  const customerMode = userRole === "CUSTOMER" || !allowTeam
   const linkSearch = query.toLowerCase()
   const filteredLinkables = linkables.filter((item) => item.label.toLowerCase().includes(linkSearch)).slice(0, 10)
   const typingNames = typingUserIds
@@ -143,6 +147,14 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
     .map((user) => displayName(user))
 
   async function loadMessages(nextRecipientId = recipientId, searchText = query) {
+    if (!allowTeam && !nextRecipientId) {
+      setMessages([])
+      setPinnedMessages([])
+      setLinkables([])
+      setLoading(false)
+      return
+    }
+
     const search = new URLSearchParams()
     if (nextRecipientId) search.set("recipientId", nextRecipientId)
     if (searchText.trim()) search.set("q", searchText.trim())
@@ -172,6 +184,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
   }
 
   async function sendTyping() {
+    if (!allowTeam && !recipientId) return
     try {
       await fetch("/api/internal-chat/typing", {
         method: "POST",
@@ -240,6 +253,10 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
     }
 
     if (!body && !attachment && !selectedLink) return
+    if (!allowTeam && !recipientId) {
+      setError("Choose a staff member to message.")
+      return
+    }
     setSending(true)
     setError("")
     const res = await fetch("/api/internal-chat", {
@@ -295,6 +312,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
   }
 
   function switchChannel(nextRecipientId: string) {
+    if (!allowTeam && !nextRecipientId) return
     setRecipientId(nextRecipientId)
     setReplyTo(null)
     setEditing(null)
@@ -327,26 +345,30 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
         <div className="border-b bg-white p-4">
           <h2 className="flex items-center gap-2 font-semibold">
             <MessageCircle className="h-5 w-5 text-blue-600" />
-            Company Chat
+            {customerMode ? "Support Chat" : "Company Chat"}
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">Admins and workers can coordinate in real time.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {customerMode ? "Message the team member helping with your request." : "Admins and workers can coordinate in real time."}
+          </p>
         </div>
 
         <div className="space-y-4 p-3">
-          <button
-            type="button"
-            onClick={() => switchChannel("")}
-            className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors ${recipientId === "" ? "bg-neutral-950 text-white" : "hover:bg-white"}`}
-          >
-            <span className={`flex h-10 w-10 items-center justify-center rounded-full ${recipientId === "" ? "bg-white/15" : "bg-blue-50"}`}>
-              <Users className={`h-5 w-5 ${recipientId === "" ? "text-white" : "text-blue-600"}`} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold">Team room</span>
-              <span className={`block truncate text-xs ${recipientId === "" ? "text-white/70" : "text-muted-foreground"}`}>Everyone in admin and worker roles</span>
-            </span>
-            {unread.team > 0 && recipientId !== "" && <UnreadBadge count={unread.team} />}
-          </button>
+          {allowTeam && (
+            <button
+              type="button"
+              onClick={() => switchChannel("")}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors ${recipientId === "" ? "bg-neutral-950 text-white" : "hover:bg-white"}`}
+            >
+              <span className={`flex h-10 w-10 items-center justify-center rounded-full ${recipientId === "" ? "bg-white/15" : "bg-blue-50"}`}>
+                <Users className={`h-5 w-5 ${recipientId === "" ? "text-white" : "text-blue-600"}`} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold">Team room</span>
+                <span className={`block truncate text-xs ${recipientId === "" ? "text-white/70" : "text-muted-foreground"}`}>Everyone in admin and worker roles</span>
+              </span>
+              {unread.team > 0 && recipientId !== "" && <UnreadBadge count={unread.team} />}
+            </button>
+          )}
 
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -359,9 +381,9 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
           </div>
 
           <div className="space-y-1">
-            <p className="px-3 text-xs font-semibold uppercase text-muted-foreground">Direct messages</p>
+            <p className="px-3 text-xs font-semibold uppercase text-muted-foreground">{customerMode ? "Support" : "Direct messages"}</p>
             {directUsers.length === 0 ? (
-              <p className="px-3 py-4 text-sm text-muted-foreground">No workers or admins found yet.</p>
+              <p className="px-3 py-4 text-sm text-muted-foreground">{customerMode ? "No support contact is available yet." : "No workers or admins found yet."}</p>
             ) : (
               directUsers.map((user) => {
                 const online = isOnline(presences[user.id])
@@ -393,8 +415,10 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
         <div className="border-b bg-white p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="font-semibold">{activeUser ? displayName(activeUser) : "Team room"}</h1>
-              <p className="mt-1 text-sm text-muted-foreground">{activeUser ? `${isOnline(presences[activeUser.id]) ? "Online" : "Offline"} | Direct chat` : "Company-wide admin and worker messages"}</p>
+              <h1 className="font-semibold">{activeUser ? displayName(activeUser) : allowTeam ? "Team room" : "Support chat"}</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {activeUser ? `${isOnline(presences[activeUser.id]) ? "Online" : "Offline"} | Direct chat` : allowTeam ? "Company-wide admin and worker messages" : "Choose a staff member to start messaging"}
+              </p>
             </div>
             <div className="rounded-full border px-3 py-1 text-xs text-muted-foreground">{messages.length} messages</div>
           </div>
@@ -418,7 +442,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
             <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
               <MessageCircle className="mb-3 h-12 w-12 opacity-50" />
               <p className="font-medium text-foreground">No messages yet</p>
-              <p className="mt-1 text-sm">Send the first message to start the conversation.</p>
+              <p className="mt-1 text-sm">{!allowTeam && !recipientId ? "Choose a staff member from the left to start." : "Send the first message to start the conversation."}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -483,20 +507,22 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
                 <Paperclip className="h-4 w-4" />
                 <input type="file" className="hidden" onChange={uploadAttachment} disabled={uploading} />
               </label>
-              <button type="button" onClick={() => setShowLinkPicker((value) => !value)} className="inline-flex h-12 w-12 items-center justify-center rounded-xl border bg-card hover:bg-accent" title="Share customer, quotation, or product">
-                <Link2 className="h-4 w-4" />
-              </button>
+              {linkables.length > 0 && (
+                <button type="button" onClick={() => setShowLinkPicker((value) => !value)} className="inline-flex h-12 w-12 items-center justify-center rounded-xl border bg-card hover:bg-accent" title="Share customer, quotation, or product">
+                  <Link2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
             <textarea
               value={message}
               onChange={(event) => handleMessageChange(event.target.value)}
-              placeholder={editing ? "Edit your message" : activeUser ? `Message ${displayName(activeUser)}` : "Message the team"}
+              placeholder={editing ? "Edit your message" : activeUser ? `Message ${displayName(activeUser)}` : allowTeam ? "Message the team" : "Choose support contact"}
               rows={2}
               className="min-h-12 flex-1 resize-none rounded-xl border border-input bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-neutral-400"
             />
             <button
               type="submit"
-              disabled={sending || uploading || (!message.trim() && !attachment && !selectedLink)}
+              disabled={sending || uploading || (!allowTeam && !recipientId) || (!message.trim() && !attachment && !selectedLink)}
               className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-neutral-950 px-4 text-sm font-semibold text-white transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Send className="h-4 w-4" />

@@ -2,10 +2,11 @@ import { getServerSession } from "next-auth"
 import { prisma } from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import Link from "next/link"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { FileText, ClipboardList, DollarSign, CalendarCheck } from "lucide-react"
+import { MessageCircle } from "lucide-react"
 import PaymentForm from "@/components/quotations/PaymentForm"
 import ReceiptForm from "@/components/quotations/ReceiptForm"
 import FollowUpForm from "@/components/quotations/FollowUpForm"
@@ -73,6 +74,7 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
   const receipted = quotation.receipts.reduce((sum, receipt) => sum + Number(receipt.amount), 0)
   const outstanding = Math.max(0, Number(quotation.total) - confirmedPaid)
   const receiptable = Math.max(0, confirmedPaid - receipted)
+  const quotationContactUserId = quotation.assignedEmployee?.userId || quotation.createdById
 
   return (
     <div className="space-y-6">
@@ -106,6 +108,15 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
           <div className="flex items-center gap-2">
             <DownloadQuotationPdf quotationId={quotation.id} />
           </div>
+          {role === "CUSTOMER" && quotationContactUserId && (
+            <Link
+              href={`/dashboard/chat?recipientId=${quotationContactUserId}`}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition-colors hover:bg-slate-50"
+            >
+              <MessageCircle className="h-4 w-4 text-blue-600" />
+              Message staff
+            </Link>
+          )}
         </div>
       </div>
 
