@@ -21,9 +21,14 @@ async function markNotificationRead(formData: FormData) {
 
   const role = (session.user as any).role
   const userId = (session.user as any).id
+  const companyId = (session.user as any).companyId as string | null
   const notification = await prisma.notification.findUnique({ where: { id } })
   if (!notification) return
-  if (!isCompanyAdminRole(role) && notification.userId !== userId) return
+  if (isCompanyAdminRole(role)) {
+    if (companyId && notification.companyId !== companyId) return
+  } else if (notification.userId !== userId) {
+    return
+  }
 
   await prisma.notification.update({
     where: { id },
@@ -41,9 +46,10 @@ async function markAllVisibleRead() {
 
   const role = (session.user as any).role
   const userId = (session.user as any).id
+  const companyId = (session.user as any).companyId as string | null
 
   await prisma.notification.updateMany({
-    where: isCompanyAdminRole(role) ? { isRead: false } : { userId, isRead: false },
+    where: isCompanyAdminRole(role) ? { companyId: companyId || undefined, isRead: false } : { userId, isRead: false },
     data: { isRead: true, readAt: new Date() },
   })
 
@@ -56,9 +62,10 @@ export default async function NotificationsPage() {
 
   const role = (session.user as any).role
   const userId = (session.user as any).id
+  const companyId = (session.user as any).companyId as string | null
 
   const notifications = await prisma.notification.findMany({
-    where: isCompanyAdminRole(role) ? {} : { userId },
+    where: isCompanyAdminRole(role) ? { companyId: companyId || undefined } : { userId },
     orderBy: { createdAt: "desc" },
     take: 100,
     include: {

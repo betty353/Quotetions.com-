@@ -7,6 +7,7 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { isCompanyAdminRole } from "@/lib/tenant"
 import { stockMovementSchema } from "@/lib/schemas"
+import { createAuditLog } from "@/lib/finance"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -47,12 +48,12 @@ async function recordStockMovement(formData: FormData) {
 
   if (newStock < 0) redirect("/dashboard/inventory?error=not-enough-stock")
 
-  await prisma.$transaction(async (tx) => {
+  const movement = await prisma.$transaction(async (tx) => {
     await tx.product.update({
       where: { id: product.id },
       data: { stock: newStock },
     })
-    await tx.productStockMovement.create({
+    return tx.productStockMovement.create({
       data: {
         companyId,
         productId: product.id,
@@ -66,6 +67,24 @@ async function recordStockMovement(formData: FormData) {
         reference: input.reference || null,
       },
     })
+  })
+
+  await createAuditLog({
+    companyId,
+    userId: (session.user as any).id,
+    action: "CREATE",
+    entity: "ProductStockMovement",
+    entityId: movement.id,
+    changes: {
+      productId: product.id,
+      productName: product.name,
+      type: input.type,
+      quantity: input.quantity,
+      previousStock,
+      newStock,
+      reason: input.reason,
+      reference: input.reference,
+    },
   })
 
   revalidatePath("/dashboard/inventory")

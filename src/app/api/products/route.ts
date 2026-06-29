@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { createProductSchema } from "@/lib/schemas"
 import { ZodError } from "zod"
 import requireRole from "@/lib/roles"
+import { createAuditLog } from "@/lib/finance"
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -78,6 +79,22 @@ export async function POST(request: NextRequest) {
         view360Url: validated.view360Url ?? null,
         isFeatured: validated.isFeatured ?? false,
         status: "ACTIVE",
+      },
+    })
+
+    await createAuditLog({
+      companyId,
+      userId: session.user.id,
+      action: "CREATE",
+      entity: "Product",
+      entityId: product.id,
+      changes: {
+        name: product.name,
+        sku: product.sku,
+        categoryId: product.categoryId,
+        unitPrice: product.unitPrice,
+        stock: product.stock,
+        status: product.status,
       },
     })
 

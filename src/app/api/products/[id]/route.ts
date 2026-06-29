@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { createProductSchema } from "@/lib/schemas"
 import { ZodError } from "zod"
 import requireRole from "@/lib/roles"
+import { createAuditLog } from "@/lib/finance"
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -51,6 +52,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
     })
 
+    await createAuditLog({
+      companyId: existing.companyId,
+      userId: session.user.id,
+      action: "UPDATE",
+      entity: "Product",
+      entityId: product.id,
+      changes: {
+        before: {
+          name: existing.name,
+          sku: existing.sku,
+          unitPrice: existing.unitPrice,
+          stock: existing.stock,
+          status: existing.status,
+        },
+        after: {
+          name: product.name,
+          sku: product.sku,
+          unitPrice: product.unitPrice,
+          stock: product.stock,
+          status: product.status,
+        },
+      },
+    })
+
     return NextResponse.json({ data: product })
   } catch (err) {
     if (err instanceof ZodError) {
@@ -76,6 +101,21 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
       where: { id },
       data: { status: "DISCONTINUED" },
     })
+
+    await createAuditLog({
+      companyId: existing.companyId,
+      userId: session.user.id,
+      action: "DELETE",
+      entity: "Product",
+      entityId: existing.id,
+      changes: {
+        name: existing.name,
+        sku: existing.sku,
+        previousStatus: existing.status,
+        status: "DISCONTINUED",
+      },
+    })
+
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error(err)

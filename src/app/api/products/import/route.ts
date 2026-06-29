@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import requireRole from "@/lib/roles"
+import { createAuditLog } from "@/lib/finance"
 
 export async function POST(request: NextRequest) {
   const session = await requireRole("ADMIN")
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await prisma.productImportHistory.create({
+    const history = await prisma.productImportHistory.create({
       data: {
         companyId,
         importedById: session.user.id,
@@ -67,6 +68,19 @@ export async function POST(request: NextRequest) {
         errorCount: errors.length,
         categoriesCreated: Array.from(createdCategories),
         errors: errors.length > 0 ? errors : Prisma.JsonNull,
+      },
+    })
+
+    await createAuditLog({
+      companyId,
+      userId: session.user.id,
+      action: "CREATE",
+      entity: "ProductImport",
+      entityId: history.id,
+      changes: {
+        createdCount: created.length,
+        errorCount: errors.length,
+        categoriesCreated: Array.from(createdCategories),
       },
     })
 

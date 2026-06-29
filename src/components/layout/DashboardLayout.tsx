@@ -8,7 +8,6 @@ import { signOut, useSession } from "next-auth/react"
 import {
   Activity,
   BarChart3,
-  Bell,
   BellRing,
   Building2,
   CalendarCheck,
@@ -39,13 +38,14 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/components/providers/ThemeProvider"
+import NotificationBell from "@/components/notifications/NotificationBell"
 
 const sidebarItems = [
   { icon: BarChart3, iconColor: "text-blue-600", label: "Dashboard", href: "/dashboard", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: Users, iconColor: "text-emerald-600", label: "Customers", href: "/dashboard/customers", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
   { icon: Package, iconColor: "text-violet-600", label: "Products & Services", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: FileText, iconColor: "text-sky-600", label: "Quotations", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: ShoppingCart, iconColor: "text-orange-600", label: "Orders", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: ShoppingCart, iconColor: "text-orange-600", label: "Orders", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: WalletCards, iconColor: "text-indigo-600", label: "Invoices", href: "/dashboard/invoices", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: Receipt, iconColor: "text-rose-600", label: "Receipts", href: "/dashboard/receipts", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: CreditCard, iconColor: "text-cyan-600", label: "Payments", href: "/dashboard/payments", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
@@ -57,8 +57,8 @@ const sidebarItems = [
   { icon: Landmark, iconColor: "text-teal-600", label: "Payment Setup", href: "/dashboard/payment-setup", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: Settings, iconColor: "text-blue-500", label: "Integrations", href: "/dashboard/payment-setup", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: Settings, iconColor: "text-neutral-700", label: "Settings", href: "/dashboard/settings", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
-  { icon: Activity, iconColor: "text-red-600", label: "Activity Logs", href: "/dashboard/notifications", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: LifeBuoy, iconColor: "text-green-600", label: "Support", href: "/dashboard/notifications", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: Activity, iconColor: "text-red-600", label: "Activity Logs", href: "/dashboard/activity-logs", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: LifeBuoy, iconColor: "text-green-600", label: "Support", href: "/dashboard/support", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: CalendarCheck, iconColor: "text-yellow-600", label: "Follow-Ups", href: "/dashboard/followups", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: Landmark, iconColor: "text-pink-600", label: "Reconciliation", href: "/dashboard/reconciliation", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
   { icon: BellRing, iconColor: "text-red-500", label: "Notifications", href: "/dashboard/notifications", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
@@ -239,10 +239,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               >
                 {resolvedTheme === "dark" ? <Sun size={20} className="text-amber-500" /> : <Moon size={20} className="text-indigo-600" />}
               </button>
-              <Link href="/dashboard/notifications" aria-label="Notifications" className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-                <Bell size={20} className="text-red-500" />
-                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />
-              </Link>
+              <NotificationBell />
               <button className="hidden items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent sm:flex">
                 <Building2 size={18} className="text-emerald-600" />
                 <span className="max-w-24 truncate">Company</span>
