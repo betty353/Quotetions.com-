@@ -116,6 +116,7 @@ model User {
   activityLogs          ActivityLog[]
   productImportHistories ProductImportHistory[]
   productStockMovements ProductStockMovement[]
+  productViews          ProductView[]
   passwordResetTokens   PasswordResetToken[]
 
   @@index([email])
@@ -153,6 +154,7 @@ model Company {
   categories            Category[]
   productImportHistories ProductImportHistory[]
   productStockMovements ProductStockMovement[]
+  productViews          ProductView[]
   quotations            Quotation[]
   payments              Payment[]
   receipts              Receipt[]
@@ -307,12 +309,33 @@ model Product {
   category              Category  @relation(fields: [categoryId], references: [id])
   quotationItems        QuotationItem[]
   stockMovements        ProductStockMovement[]
+  productViews          ProductView[]
 
   @@index([categoryId])
   @@index([companyId])
   @@index([sku])
   @@index([name])
   @@unique([companyId, sku])
+}
+
+model ProductView {
+  id                    String    @id @default(cuid())
+  companyId             String?
+  productId             String
+  userId                String?
+  sessionId             String?
+  ipHash                String?
+  userAgent             String?
+  createdAt             DateTime  @default(now())
+
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  product               Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user                  User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([productId])
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model ProductStockMovement {

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { formatCurrency } from "@/lib/utils"
+import ProductViewTracker from "@/components/store/ProductViewTracker"
 
 type Props = {
   params: Promise<{ companySlug: string; productId: string }>
@@ -53,6 +54,7 @@ export default async function StoreProductDetailPage({ params }: Props) {
 
   return (
     <main className="min-h-screen bg-[#f5f6f8] text-foreground">
+      <ProductViewTracker companySlug={product.company.slug} productId={product.id} />
       <header className="border-b bg-white">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
           <Link href={`/store/${product.company.slug}`} className="inline-flex items-center gap-2 text-sm font-medium">

@@ -1,7 +1,7 @@
 import Link from "next/link"
 import type { ReactNode } from "react"
 import { getServerSession } from "next-auth"
-import { BadgeCheck, Building2, Grid3X3, Mail, MapPin, MessageCircle, PackageSearch, Phone, Search, ShieldCheck, ShoppingCart, Sparkles, Store, Truck } from "lucide-react"
+import { BadgeCheck, Building2, Eye, Flame, Grid3X3, Mail, MapPin, MessageCircle, PackageSearch, Phone, Search, ShieldCheck, ShoppingCart, Sparkles, Store, Truck } from "lucide-react"
 import SafeImage from "@/components/ui/safe-image"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -92,6 +92,48 @@ export default async function StorePage({ params, searchParams }: StorePageProps
     : `/auth/register?type=customer&companySlug=${company.slug}`
   const featuredProduct = company.products.find((product) => safeImageSrc(product.image)) || company.products[0]
   const featuredImage = safeImageSrc(featuredProduct?.image)
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+  const [mostlyBoughtRows, mostViewedRows] = await Promise.all([
+    prisma.quotationItem.groupBy({
+      by: ["productId"],
+      where: {
+        product: { companyId: company.id, status: "ACTIVE" },
+        quotation: { companyId: company.id },
+      },
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: "desc" } },
+      take: 8,
+    }),
+    prisma.productView.groupBy({
+      by: ["productId"],
+      where: {
+        companyId: company.id,
+        createdAt: { gte: thirtyDaysAgo },
+      },
+      _count: { productId: true },
+      orderBy: { _count: { productId: "desc" } },
+      take: 8,
+    }),
+  ])
+
+  const rankedProductIds = Array.from(new Set([
+    ...mostlyBoughtRows.map((row) => row.productId),
+    ...mostViewedRows.map((row) => row.productId),
+  ]))
+  const rankedProducts = rankedProductIds.length > 0
+    ? await prisma.product.findMany({
+        where: { id: { in: rankedProductIds }, companyId: company.id, status: "ACTIVE" },
+        include: { category: true },
+      })
+    : []
+  const rankedProductMap = new Map(rankedProducts.map((product) => [product.id, product]))
+  const mostlyBought = mostlyBoughtRows
+    .map((row) => ({ product: rankedProductMap.get(row.productId), stat: `${row._sum.quantity || 0} requested` }))
+    .filter((item): item is { product: NonNullable<typeof item.product>; stat: string } => Boolean(item.product))
+  const mostViewed = mostViewedRows
+    .map((row) => ({ product: rankedProductMap.get(row.productId), stat: `${row._count.productId} views` }))
+    .filter((item): item is { product: NonNullable<typeof item.product>; stat: string } => Boolean(item.product))
 
   return (
     <main className="min-h-screen bg-[#f5f6f8] text-foreground">
@@ -222,6 +264,33 @@ export default async function StorePage({ params, searchParams }: StorePageProps
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-6">
+        {(mostlyBought.length > 0 || mostViewed.length > 0) && (
+          <div className="mb-6 grid gap-5 xl:grid-cols-2">
+            {mostlyBought.length > 0 && (
+              <MarketplaceRail
+                title="Mostly bought by customers"
+                description="Products customers request most in quotations."
+                icon={<Flame className="h-4 w-4 text-orange-600" />}
+                items={mostlyBought}
+                currency={currency}
+                customerCta={customerCta}
+                companySlug={company.slug}
+              />
+            )}
+            {mostViewed.length > 0 && (
+              <MarketplaceRail
+                title="Viewed by other customers"
+                description="Products getting attention in the last 30 days."
+                icon={<Eye className="h-4 w-4 text-blue-600" />}
+                items={mostViewed}
+                currency={currency}
+                customerCta={customerCta}
+                companySlug={company.slug}
+              />
+            )}
+          </div>
+        )}
+
         <form className="mb-5 grid gap-3 rounded-xl border border-border bg-white p-3 md:hidden">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -277,6 +346,90 @@ function InfoRow({ icon, label }: { icon: ReactNode; label: string }) {
     <div className="flex items-center gap-2 text-muted-foreground">
       {icon}
       <span className="min-w-0 truncate">{label}</span>
+    </div>
+  )
+}
+
+function MarketplaceRail({
+  title,
+  description,
+  icon,
+  items,
+  currency,
+  customerCta,
+  companySlug,
+}: {
+  title: string
+  description: string
+  icon: ReactNode
+  items: Array<{ product: any; stat: string }>
+  currency: string
+  customerCta: string
+  companySlug: string
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-white p-4">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-base font-bold">{icon}{title}</h2>
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+        </div>
+        <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">Top {items.length}</Badge>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {items.slice(0, 4).map((item, index) => (
+          <CompactProductCard
+            key={`${title}-${item.product.id}`}
+            product={item.product}
+            rank={index + 1}
+            stat={item.stat}
+            currency={currency}
+            customerCta={customerCta}
+            companySlug={companySlug}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function CompactProductCard({
+  product,
+  rank,
+  stat,
+  currency,
+  customerCta,
+  companySlug,
+}: {
+  product: any
+  rank: number
+  stat: string
+  currency: string
+  customerCta: string
+  companySlug: string
+}) {
+  const gallery = Array.isArray(product.images) ? product.images.filter((image: unknown): image is string => typeof image === "string") : []
+  const productImage = safeImageSrc(product.image) || safeImageSrc(gallery[0])
+
+  return (
+    <div className="grid grid-cols-[88px_1fr] gap-3 rounded-lg border border-slate-100 bg-slate-50 p-2 transition-colors hover:bg-orange-50">
+      <Link href={`/store/${companySlug}/products/${product.id}`} className="relative aspect-square overflow-hidden rounded-lg border bg-white">
+        {productImage ? (
+          <SafeImage src={productImage} alt={product.name} width={160} height={160} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full items-center justify-center"><PackageSearch className="h-8 w-8 text-orange-500" /></div>
+        )}
+        <span className="absolute left-1 top-1 rounded bg-orange-600 px-1.5 py-0.5 text-[10px] font-bold text-white">#{rank}</span>
+      </Link>
+      <div className="min-w-0">
+        <Link href={`/store/${companySlug}/products/${product.id}`} className="line-clamp-2 text-sm font-semibold leading-5 hover:underline">{product.name}</Link>
+        <p className="mt-1 text-xs text-muted-foreground">{product.category?.name || "Catalog"} | {stat}</p>
+        <p className="mt-1 text-sm font-bold text-orange-700">{currency} {Number(product.unitPrice).toFixed(2)}</p>
+        <div className="mt-2 flex gap-2">
+          <Link href={`/store/${companySlug}/products/${product.id}`} className="inline-flex h-7 items-center rounded-md border bg-white px-2 text-[11px] font-semibold hover:bg-accent">Details</Link>
+          <Link href={customerCta} className="inline-flex h-7 items-center rounded-md bg-orange-600 px-2 text-[11px] font-semibold text-white hover:bg-orange-700">Quote</Link>
+        </div>
+      </div>
     </div>
   )
 }
