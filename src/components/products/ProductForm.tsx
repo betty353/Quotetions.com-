@@ -26,6 +26,10 @@ export default function ProductForm({ categories = [], initial = {}, mode = "cre
   const [currency, setCurrency] = useState(initial.currency || "USD")
   const [stock, setStock] = useState(initial.stock ?? 0)
   const [imageUrl, setImageUrl] = useState(initial.image || "")
+  const [galleryText, setGalleryText] = useState<string>(Array.isArray(initial.images) ? initial.images.join("\n") : "")
+  const [shortVideoUrl, setShortVideoUrl] = useState(initial.shortVideoUrl || "")
+  const [view360Url, setView360Url] = useState(initial.view360Url || "")
+  const [isFeatured, setIsFeatured] = useState(Boolean(initial.isFeatured))
   const [filePreview, setFilePreview] = useState<string | null>(null)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -38,6 +42,12 @@ export default function ProductForm({ categories = [], initial = {}, mode = "cre
     setError("")
 
     try {
+      const galleryImages = galleryText
+        .split(/\r?\n/)
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .slice(0, 4)
+
       const payload = {
         sku,
         name,
@@ -47,6 +57,10 @@ export default function ProductForm({ categories = [], initial = {}, mode = "cre
         currency,
         stock: Number(stock),
         image: imageUrl || null,
+        images: galleryImages,
+        shortVideoUrl: shortVideoUrl || undefined,
+        view360Url: view360Url || undefined,
+        isFeatured,
       }
 
       const method = mode === "create" ? "POST" : "PUT"
@@ -85,6 +99,40 @@ export default function ProductForm({ categories = [], initial = {}, mode = "cre
         <div>
           <Label htmlFor="name">Name</Label>
           <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="mb-3">
+          <p className="text-sm font-semibold">Product media</p>
+          <p className="text-xs text-muted-foreground">Add up to four extra product images, a short video, or a 360-degree product link.</p>
+        </div>
+        <div className="grid gap-4">
+          <div>
+            <Label htmlFor="galleryText">Extra Image URLs</Label>
+            <Textarea
+              id="galleryText"
+              value={galleryText}
+              onChange={(event) => setGalleryText(event.target.value)}
+              placeholder={"https://image-1...\nhttps://image-2...\nhttps://image-3...\nhttps://image-4..."}
+              rows={4}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">One URL per line. The first four will be shown on the product detail page.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label htmlFor="shortVideoUrl">Short Video URL</Label>
+              <Input id="shortVideoUrl" value={shortVideoUrl} onChange={(event) => setShortVideoUrl(event.target.value)} placeholder="https://..." />
+            </div>
+            <div>
+              <Label htmlFor="view360Url">360-degree View URL</Label>
+              <Input id="view360Url" value={view360Url} onChange={(event) => setView360Url(event.target.value)} placeholder="https://..." />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={isFeatured} onChange={(event) => setIsFeatured(event.target.checked)} className="h-4 w-4 rounded border-slate-300" />
+            Feature this product in the catalog
+          </label>
         </div>
       </div>
 

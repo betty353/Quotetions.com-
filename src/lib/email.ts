@@ -39,7 +39,7 @@ export async function sendPasswordResetEmail({ to, firstName, resetUrl }: Passwo
     },
   })
 
-  const appName = process.env.NEXT_PUBLIC_APP_NAME || "Quotetion"
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || "Astro city crm"
   const from = process.env.SMTP_FROM || `"${appName}" <${smtp.user}>`
   const greeting = firstName ? `Hi ${firstName},` : "Hi,"
 

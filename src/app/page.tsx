@@ -21,8 +21,8 @@ export default async function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <Image src="/logo.jpg" alt="Quotetion logo" width={40} height={40} className="h-10 w-10 rounded-lg object-contain" />
-              <span className="text-xl font-bold text-foreground">Quotetion</span>
+              <Image src="/logo.jpg" alt="Astro city crm logo" width={40} height={40} className="h-10 w-10 rounded-lg object-contain" />
+              <span className="text-xl font-bold text-foreground">Astro city crm</span>
             </div>
             <div className="flex items-center gap-4">
               <Link
@@ -137,7 +137,7 @@ export default async function HomePage() {
       <footer className="mt-20 border-t border-border bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2026 Quotetion. All rights reserved.
+            © 2026 Astro city crm. All rights reserved.
           </p>
         </div>
       </footer>

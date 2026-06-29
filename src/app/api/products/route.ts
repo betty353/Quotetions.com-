@@ -73,6 +73,10 @@ export async function POST(request: NextRequest) {
         stock: validated.stock ?? 0,
         reorderLevel: validated.reorderLevel ?? null,
         image: validated.image ?? null,
+        images: validated.images ?? undefined,
+        shortVideoUrl: validated.shortVideoUrl ?? null,
+        view360Url: validated.view360Url ?? null,
+        isFeatured: validated.isFeatured ?? false,
         status: "ACTIVE",
       },
     })

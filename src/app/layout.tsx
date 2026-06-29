@@ -3,16 +3,16 @@ import AppProviders from "@/components/providers/AppProviders"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Quotetion - Enterprise Quotation Management",
+  title: "Astro city crm - Enterprise Quotation Management",
   description: "Professional quotation, sales follow-up & receipt management platform for modern businesses",
   keywords: "quotation, sales, CRM, receipt, invoice, business management",
-  authors: [{ name: "Quotetion" }],
-  creator: "Quotetion",
+  authors: [{ name: "Astro city crm" }],
+  creator: "Astro city crm",
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://quotetion.com",
-    title: "Quotetion",
+    url: "https://quotetion.vercel.app",
+    title: "Astro city crm",
     description: "Enterprise Quotation Management Platform",
   },
 }

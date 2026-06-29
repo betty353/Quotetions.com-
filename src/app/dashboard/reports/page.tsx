@@ -24,6 +24,8 @@ export default async function ReportsPage() {
     quotationStatuses,
     topProductRows,
     employees,
+    products,
+    stockMovements,
   ] = await Promise.all([
     prisma.quotation.findMany({
       where: { companyId },
@@ -55,14 +57,24 @@ export default async function ReportsPage() {
       },
       orderBy: { employeeId: "asc" },
     }),
+    prisma.product.findMany({
+      where: { companyId },
+      include: { category: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.productStockMovement.findMany({
+      where: { companyId },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    }),
   ])
 
   const productIds = topProductRows.map((row) => row.productId)
-  const products = await prisma.product.findMany({
+  const topProducts = await prisma.product.findMany({
     where: { companyId, id: { in: productIds } },
     include: { category: true },
   })
-  const productMap = new Map(products.map((product) => [product.id, product]))
+  const productMap = new Map(topProducts.map((product) => [product.id, product]))
 
   const quotedTotal = quotations.reduce((sum, quotation) => sum + Number(quotation.total), 0)
   const paidTotal = payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
@@ -70,6 +82,12 @@ export default async function ReportsPage() {
   const completedCount = quotations.filter((quotation) => quotation.status === "COMPLETED").length
   const conversionRate = quotations.length ? (completedCount / quotations.length) * 100 : 0
   const collectionRate = quotedTotal ? (paidTotal / quotedTotal) * 100 : 0
+  const stockValue = products.reduce((sum, product) => sum + product.stock * Number(product.unitPrice), 0)
+  const totalStock = products.reduce((sum, product) => sum + product.stock, 0)
+  const stockIn = stockMovements.filter((movement) => movement.type === "STOCK_IN").reduce((sum, movement) => sum + movement.quantity, 0)
+  const stockOut = stockMovements.filter((movement) => movement.type === "STOCK_OUT").reduce((sum, movement) => sum + movement.quantity, 0)
+  const damaged = stockMovements.filter((movement) => movement.type === "DAMAGED").reduce((sum, movement) => sum + movement.quantity, 0)
+  const lost = stockMovements.filter((movement) => movement.type === "LOST").reduce((sum, movement) => sum + movement.quantity, 0)
 
   const customerRows = quotations.slice(0, 20).map((quotation) => {
     const paid = quotation.payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
@@ -95,6 +113,8 @@ export default async function ReportsPage() {
       collected,
       quotations: employee.quotations.length,
       followUps: employee.followUps.length,
+      target: Number(employee.quotaTarget || 0),
+      achievement: Number(employee.quotaTarget || 0) > 0 ? (collected / Number(employee.quotaTarget)) * 100 : 0,
     }
   })
 
@@ -113,6 +133,13 @@ export default async function ReportsPage() {
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Collected</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(paidTotal)}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Receipted</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(receiptedTotal)}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Conversion</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{conversionRate.toFixed(1)}%</div><p className="text-xs text-muted-foreground mt-1">{collectionRate.toFixed(1)}% collected</p></CardContent></Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Total Stock</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{totalStock}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Stock Value</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(stockValue, products[0]?.currency || "USD")}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Stock In / Out</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{stockIn} / {stockOut}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Damaged / Lost</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{damaged} / {lost}</div></CardContent></Card>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
@@ -166,7 +193,7 @@ export default async function ReportsPage() {
         <CardContent className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="border-b border-slate-200 text-slate-500">
-              <tr><th className="px-4 py-3">Employee</th><th className="px-4 py-3">Quotations</th><th className="px-4 py-3">Assigned</th><th className="px-4 py-3">Collected</th><th className="px-4 py-3">Follow-Ups</th></tr>
+              <tr><th className="px-4 py-3">Employee</th><th className="px-4 py-3">Quotations</th><th className="px-4 py-3">Assigned</th><th className="px-4 py-3">Collected</th><th className="px-4 py-3">Target</th><th className="px-4 py-3">Achieved</th><th className="px-4 py-3">Follow-Ups</th></tr>
             </thead>
             <tbody>
               {employeeRows.map((row) => (
@@ -175,6 +202,8 @@ export default async function ReportsPage() {
                   <td className="px-4 py-3">{row.quotations}</td>
                   <td className="px-4 py-3">{formatCurrency(row.assigned)}</td>
                   <td className="px-4 py-3">{formatCurrency(row.collected)}</td>
+                  <td className="px-4 py-3">{row.target > 0 ? formatCurrency(row.target) : "-"}</td>
+                  <td className="px-4 py-3">{row.target > 0 ? `${row.achievement.toFixed(1)}%` : "-"}</td>
                   <td className="px-4 py-3">{row.followUps}</td>
                 </tr>
               ))}

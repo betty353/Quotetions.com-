@@ -6,7 +6,13 @@ import requireRole from "@/lib/roles"
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const product = await prisma.product.findUnique({ where: { id }, include: { category: true } })
+  const product = await prisma.product.findUnique({
+    where: { id },
+    include: {
+      category: true,
+      stockMovements: { orderBy: { createdAt: "desc" }, take: 20 },
+    },
+  })
   if (!product) return NextResponse.json({ error: "Not found" }, { status: 404 })
   return NextResponse.json({ data: product })
 }
@@ -37,6 +43,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         stock: validated.stock ?? 0,
         reorderLevel: validated.reorderLevel ?? null,
         image: validated.image ?? null,
+        images: validated.images ?? undefined,
+        shortVideoUrl: validated.shortVideoUrl ?? null,
+        view360Url: validated.view360Url ?? null,
+        isFeatured: validated.isFeatured ?? false,
         status: validated.status ?? "ACTIVE",
       },
     })
@@ -62,7 +72,10 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     if (!existing || (companyId && existing.companyId !== companyId)) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 })
     }
-    await prisma.product.delete({ where: { id } })
+    await prisma.product.update({
+      where: { id },
+      data: { status: "DISCONTINUED" },
+    })
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error(err)

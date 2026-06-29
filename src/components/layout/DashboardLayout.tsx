@@ -46,12 +46,12 @@ const sidebarItems = [
   { icon: Package, iconColor: "text-violet-600", label: "Products & Services", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: FileText, iconColor: "text-sky-600", label: "Quotations", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: ShoppingCart, iconColor: "text-orange-600", label: "Orders", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
-  { icon: WalletCards, iconColor: "text-indigo-600", label: "Invoices", href: "/dashboard/receipts", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
+  { icon: WalletCards, iconColor: "text-indigo-600", label: "Invoices", href: "/dashboard/invoices", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: Receipt, iconColor: "text-rose-600", label: "Receipts", href: "/dashboard/receipts", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: CreditCard, iconColor: "text-cyan-600", label: "Payments", href: "/dashboard/payments", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: BarChart3, iconColor: "text-lime-600", label: "Reports", href: "/dashboard/reports", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
-  { icon: PackageSearch, iconColor: "text-fuchsia-600", label: "Inventory", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
-  { icon: Truck, iconColor: "text-amber-600", label: "Suppliers", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: PackageSearch, iconColor: "text-fuchsia-600", label: "Inventory", href: "/dashboard/inventory", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: Truck, iconColor: "text-amber-600", label: "Products", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: Building2, iconColor: "text-stone-700", label: "Company Profile", href: "/dashboard/settings", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: UserCog, iconColor: "text-purple-600", label: "Users", href: "/dashboard/employees", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: Landmark, iconColor: "text-teal-600", label: "Payment Setup", href: "/dashboard/payment-setup", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
@@ -91,9 +91,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <div className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-card/95 backdrop-blur lg:hidden">
         <div className="flex h-16 items-center justify-between px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <Image src="/logo.jpg" alt="Quotetion logo" width={32} height={32} className="h-8 w-8 rounded-lg object-contain" />
+            <Image src="/logo.jpg" alt="Astro city crm logo" width={32} height={32} className="h-8 w-8 rounded-lg object-contain" />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">Quotetion</p>
+              <p className="truncate text-sm font-semibold">Astro city crm</p>
               <p className="truncate text-xs text-muted-foreground">CRM Workspace</p>
             </div>
           </div>
@@ -116,11 +116,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="flex h-16 items-center gap-3 border-b border-border px-4">
-          <Image src="/logo.jpg" alt="Quotetion logo" width={36} height={36} className="h-9 w-9 rounded-xl object-contain" />
+          <Image src="/logo.jpg" alt="Astro city crm logo" width={36} height={36} className="h-9 w-9 rounded-xl object-contain" />
           {!collapsed && (
             <button className="flex min-w-0 flex-1 items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent">
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold">Quotetion</span>
+                <span className="block truncate text-sm font-semibold">Astro city crm</span>
                 <span className="block truncate text-xs text-muted-foreground">Main workspace</span>
               </span>
               <ChevronDown size={16} className="text-muted-foreground" />

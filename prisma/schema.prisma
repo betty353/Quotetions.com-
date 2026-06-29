@@ -115,6 +115,7 @@ model User {
   followUps             FollowUp[] @relation("FollowUpCreatedBy")
   activityLogs          ActivityLog[]
   productImportHistories ProductImportHistory[]
+  productStockMovements ProductStockMovement[]
   passwordResetTokens   PasswordResetToken[]
 
   @@index([email])
@@ -151,6 +152,7 @@ model Company {
   products              Product[]
   categories            Category[]
   productImportHistories ProductImportHistory[]
+  productStockMovements ProductStockMovement[]
   quotations            Quotation[]
   payments              Payment[]
   receipts              Receipt[]
@@ -212,6 +214,11 @@ model Customer {
   id                    String    @id @default(cuid())
   userId                String    @unique
   companyId             String?
+  nrc                   String?
+  passportPhotoUrl      String?
+  village               String?
+  town                  String?
+  whatsappNumber        String?
   companyName           String?
   companyRegistration   String?
   taxId                 String?
@@ -287,6 +294,10 @@ model Product {
   stock                 Int       @default(0)
   reorderLevel          Int?
   image                 String?
+  images                Json?
+  shortVideoUrl         String?
+  view360Url            String?
+  isFeatured            Boolean   @default(false)
   status                String    @default("ACTIVE") // ACTIVE, INACTIVE, DISCONTINUED
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
@@ -295,12 +306,37 @@ model Product {
   company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   category              Category  @relation(fields: [categoryId], references: [id])
   quotationItems        QuotationItem[]
+  stockMovements        ProductStockMovement[]
 
   @@index([categoryId])
   @@index([companyId])
   @@index([sku])
   @@index([name])
   @@unique([companyId, sku])
+}
+
+model ProductStockMovement {
+  id                    String    @id @default(cuid())
+  companyId             String?
+  productId             String
+  userId                String?
+  type                  String
+  quantity              Int
+  previousStock         Int
+  newStock              Int
+  unitCost              Decimal?  @db.Decimal(12, 2)
+  reason                String?
+  reference             String?
+  createdAt             DateTime  @default(now())
+
+  company               Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  product               Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user                  User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([productId])
+  @@index([type])
+  @@index([createdAt])
 }
 
 // Product Categories

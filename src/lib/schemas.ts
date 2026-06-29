@@ -59,7 +59,20 @@ export const createProductSchema = z.object({
   stock: z.coerce.number().default(0),
   reorderLevel: z.coerce.number().optional(),
   image: z.string().optional(),
+  images: z.array(z.string().url()).optional(),
+  shortVideoUrl: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
+  view360Url: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
+  isFeatured: z.boolean().optional(),
   status: z.string().optional(),
+})
+
+export const stockMovementSchema = z.object({
+  productId: z.string().min(1, "Product is required"),
+  type: z.enum(["STOCK_IN", "STOCK_OUT", "DAMAGED", "LOST", "ADJUSTMENT"]),
+  quantity: z.coerce.number().int().positive("Quantity must be positive"),
+  unitCost: z.coerce.number().min(0).optional(),
+  reason: z.string().optional(),
+  reference: z.string().optional(),
 })
 
 export const createQuotationSchema = z.object({
@@ -215,6 +228,7 @@ export type RegisterInput = z.infer<typeof registerSchema>
 export type BusinessRegistrationInput = z.infer<typeof businessRegistrationSchema>
 export type CustomerRegistrationInput = z.infer<typeof customerRegistrationSchema>
 export type CreateProductInput = z.infer<typeof createProductSchema>
+export type StockMovementInput = z.infer<typeof stockMovementSchema>
 export type CreateQuotationInput = z.infer<typeof createQuotationSchema>
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>
 export type CreateReceiptInput = z.infer<typeof createReceiptSchema>

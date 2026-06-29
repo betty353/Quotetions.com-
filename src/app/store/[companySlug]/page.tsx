@@ -114,7 +114,7 @@ export default async function StorePage({ params, searchParams }: StorePageProps
           <form className="hidden min-w-0 flex-1 items-center md:flex">
             <div className="flex h-11 min-w-0 flex-1 items-center rounded-l-xl border border-r-0 border-orange-300 bg-white px-3">
               <Search className="mr-2 h-4 w-4 text-orange-600" />
-              <Input name="q" defaultValue={query} placeholder="Search products, services, suppliers..." className="h-9 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0" />
+              <Input name="q" defaultValue={query} placeholder="Search products, services, catalog..." className="h-9 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0" />
             </div>
             <input type="hidden" name="category" value={category} />
             <button type="submit" className="h-11 rounded-r-xl bg-orange-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-orange-700">
@@ -160,7 +160,7 @@ export default async function StorePage({ params, searchParams }: StorePageProps
             <div className="grid min-h-[320px] lg:grid-cols-[1.1fr_0.9fr]">
               <div className="flex flex-col justify-center bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_48%,#eff6ff_100%)] p-6 sm:p-8">
                 <div className="mb-4 flex flex-wrap gap-2">
-                  <Badge className="bg-orange-50 text-orange-700 hover:bg-orange-100"><BadgeCheck className="mr-1 h-3 w-3" /> Verified Supplier</Badge>
+                  <Badge className="bg-orange-50 text-orange-700 hover:bg-orange-100"><BadgeCheck className="mr-1 h-3 w-3" /> Verified Products</Badge>
                   <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-100"><ShieldCheck className="mr-1 h-3 w-3" /> Secure quotation</Badge>
                 </div>
                 <h1 className="max-w-2xl text-3xl font-bold tracking-tight text-neutral-950 sm:text-4xl">{company.name}</h1>
@@ -173,7 +173,7 @@ export default async function StorePage({ params, searchParams }: StorePageProps
                   {company.phone && (
                     <a href={`tel:${company.phone}`} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-white px-5 text-sm font-semibold transition-colors hover:bg-accent">
                       <Phone className="h-4 w-4 text-emerald-600" />
-                      Contact supplier
+                      Contact company
                     </a>
                   )}
                 </div>
@@ -204,7 +204,7 @@ export default async function StorePage({ params, searchParams }: StorePageProps
               </div>
               <div className="min-w-0">
                 <p className="truncate font-semibold">{company.name}</p>
-                <p className="text-xs text-muted-foreground">Supplier profile</p>
+                <p className="text-xs text-muted-foreground">Product store profile</p>
               </div>
             </div>
             <div className="mt-4 space-y-3 text-sm">
@@ -263,7 +263,7 @@ export default async function StorePage({ params, searchParams }: StorePageProps
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {company.products.map((product) => (
-              <StoreProductCard key={product.id} product={product} currency={currency} customerCta={customerCta} />
+              <StoreProductCard key={product.id} product={product} currency={currency} customerCta={customerCta} companySlug={company.slug} />
             ))}
           </div>
         )}
@@ -281,7 +281,7 @@ function InfoRow({ icon, label }: { icon: ReactNode; label: string }) {
   )
 }
 
-function StoreProductCard({ product, currency, customerCta }: { product: any; currency: string; customerCta: string }) {
+function StoreProductCard({ product, currency, customerCta, companySlug }: { product: any; currency: string; customerCta: string; companySlug: string }) {
   const productImage = safeImageSrc(product.image)
 
   return (
@@ -301,7 +301,7 @@ function StoreProductCard({ product, currency, customerCta }: { product: any; cu
       <CardContent className="space-y-3 p-4">
         <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-200">{product.category?.name || "Catalog"}</Badge>
         <div>
-          <h2 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5">{product.name}</h2>
+          <Link href={`/store/${companySlug}/products/${product.id}`} className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 underline-offset-4 hover:underline">{product.name}</Link>
           {product.description && <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">{product.description}</p>}
         </div>
         <div className="flex items-end justify-between gap-3">

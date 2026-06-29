@@ -369,7 +369,7 @@ export default function PaymentSetupForm({ setup }: { setup: PaymentSetup | null
               </div>
             </div>
             <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
-              DPO processes customer payments and settles funds to your registered business destination. Quotetion stores status, receipts, and reconciliation records.
+              DPO processes customer payments and settles funds to your registered business destination. Astro city crm stores status, receipts, and reconciliation records.
             </div>
           </CardContent>
         </Card>

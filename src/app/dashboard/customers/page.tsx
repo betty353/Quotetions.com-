@@ -15,8 +15,11 @@ export default async function CustomersPage() {
 
   const role = (session.user as any).role
   if (!isCompanyAdminRole(role) && role !== "EMPLOYEE") redirect("/dashboard")
+  const companyId = (session.user as any).companyId as string | null
+  if (!companyId) redirect("/dashboard")
 
   const customers = await prisma.customer.findMany({
+    where: { companyId },
     orderBy: { updatedAt: "desc" },
     include: {
       user: true,
@@ -121,7 +124,9 @@ export default async function CustomersPage() {
                 {rows.map(({ customer, quotationCount, quoted, paid, outstanding, latestQuotation, latestFollowUp }) => (
                   <tr key={customer.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-3">
-                      <div className="font-medium">{customer.companyName || customer.contactPerson || `${customer.user.firstName} ${customer.user.lastName}`}</div>
+                      <Link href={`/dashboard/customers/${customer.id}`} className="font-medium text-foreground underline-offset-4 hover:underline">
+                        {customer.companyName || customer.contactPerson || `${customer.user.firstName} ${customer.user.lastName}`}
+                      </Link>
                       <div className="text-xs text-slate-500">{customer.user.email}</div>
                     </td>
                     <td className="px-4 py-3">

@@ -14,6 +14,7 @@ interface Product {
   unitPrice: string | number
   currency: string
   stock: number
+  sold?: number
   status: string
 }
 
@@ -43,12 +44,27 @@ export default function ProductsTable({ products }: { products: Product[] }) {
     setProcessing(true)
     try {
       for (const id of selectedIds) {
-        await fetch(`/api/products/${id}`, { method: "DELETE" })
+        await fetch(`/api/products/${id}`, { method: "DELETE", credentials: "include" })
       }
       location.reload()
     } catch (err) {
       console.error(err)
       alert("Failed to delete some items")
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  async function handleDeleteOne(id: string, name: string) {
+    if (!confirm(`Remove ${name} from active products? Existing quotations will stay safe.`)) return
+    setProcessing(true)
+    try {
+      const res = await fetch(`/api/products/${id}`, { method: "DELETE", credentials: "include" })
+      if (!res.ok) throw new Error("Failed to remove product")
+      location.reload()
+    } catch (err) {
+      console.error(err)
+      alert("Failed to remove product")
     } finally {
       setProcessing(false)
     }
@@ -104,6 +120,7 @@ export default function ProductsTable({ products }: { products: Product[] }) {
               <th className="p-3">Category</th>
               <th className="p-3">Price</th>
               <th className="p-3">Stock</th>
+              <th className="p-3">Sold</th>
               <th className="p-3">Status</th>
               <th className="p-3">Actions</th>
             </tr>
@@ -116,14 +133,30 @@ export default function ProductsTable({ products }: { products: Product[] }) {
                 <td className="p-3 text-sm">
                   {p.image ? <SafeImage src={p.image} alt={p.name} width={48} height={48} className="h-12 w-12 rounded object-cover" /> : <div className="w-12 h-12 bg-slate-100 rounded flex items-center justify-center text-xs text-muted-foreground">No Image</div>}
                 </td>
-                <td className="p-3 text-sm">{p.name}</td>
+                <td className="p-3 text-sm">
+                  <Link href={`/dashboard/products/${p.id}`} className="font-medium underline-offset-4 hover:underline">{p.name}</Link>
+                </td>
                 <td className="p-3 text-sm">{p.category?.name || '-'}</td>
                 <td className="p-3 text-sm">{formatCurrency(String(p.unitPrice), p.currency)}</td>
-                <td className="p-3 text-sm">{p.stock}</td>
+                <td className="p-3 text-sm">
+                  <div className="font-medium">{p.stock}</div>
+                  <div className={`text-xs ${p.stock <= 0 ? "text-red-600" : p.stock <= 5 ? "text-amber-600" : "text-emerald-600"}`}>
+                    {p.stock <= 0 ? "Sold out" : p.stock <= 5 ? "Low stock" : "In stock"}
+                  </div>
+                </td>
+                <td className="p-3 text-sm">{p.sold ?? 0}</td>
                 <td className="p-3 text-sm">{p.status}</td>
                 <td className="p-3 text-sm">
                   <div className="flex items-center gap-2">
                     <Link href={`/dashboard/products/${p.id}`} className="text-foreground underline-offset-4 hover:underline">View</Link>
+                    <button
+                      type="button"
+                      disabled={processing}
+                      onClick={() => handleDeleteOne(p.id, p.name)}
+                      className="text-red-600 underline-offset-4 hover:underline disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
                   </div>
                 </td>
               </tr>
