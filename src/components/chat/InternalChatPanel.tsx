@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import { MessageCircle, Send, Users } from "lucide-react"
+import { playSentMessageTone } from "@/lib/client-sounds"
 
 type ChatUser = {
   id: string
@@ -101,6 +102,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers }: Inter
     }
 
     setMessage("")
+    playSentMessageTone()
     setSending(false)
     await loadMessages()
   }

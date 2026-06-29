@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Bell, X } from "lucide-react"
+import { playNotificationTone } from "@/lib/client-sounds"
 
 type NotificationItem = {
   id: string
@@ -11,11 +13,31 @@ type NotificationItem = {
   type: string
   isRead: boolean
   createdAt: string
+  relatedId?: string | null
+  relatedModel?: string | null
+  customerId?: string | null
   quotationId?: string | null
+  paymentId?: string | null
+  receiptId?: string | null
   followUpId?: string | null
 }
 
+function notificationHref(notification: NotificationItem) {
+  if (notification.relatedModel === "InternalChatMessage") return "/dashboard/chat"
+  if (notification.relatedModel === "Quotation" || notification.quotationId) {
+    const quotationId = notification.quotationId || notification.relatedId
+    return quotationId ? `/dashboard/quotations/${quotationId}` : "/dashboard/quotations"
+  }
+  if (notification.relatedModel === "FollowUp") return notification.quotationId ? `/dashboard/quotations/${notification.quotationId}` : "/dashboard/followups"
+  if (notification.relatedModel === "Receipt") return "/dashboard/receipts"
+  if (notification.relatedModel === "Payment") return "/dashboard/payments"
+  if (notification.relatedModel === "Customer" && notification.customerId) return `/dashboard/customers/${notification.customerId}`
+  if (notification.customerId) return `/dashboard/customers/${notification.customerId}`
+  return "/dashboard/notifications"
+}
+
 export default function NotificationBell() {
+  const router = useRouter()
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [unread, setUnread] = useState(0)
   const [toast, setToast] = useState<NotificationItem | null>(null)
@@ -39,10 +61,17 @@ export default function NotificationBell() {
       if (newest && !seenIds.current.has(newest.id)) {
         seenIds.current.add(newest.id)
         setToast(newest)
+        playNotificationTone()
       }
     } catch {
       // Keep polling quiet; the notifications page still shows full errors if needed.
     }
+  }
+
+  async function openNotification(notification: NotificationItem) {
+    const href = notificationHref(notification)
+    await markRead(notification.id)
+    router.push(href)
   }
 
   async function markRead(id: string) {
@@ -90,9 +119,9 @@ export default function NotificationBell() {
             </button>
           </div>
           <div className="mt-4 flex items-center justify-end gap-2">
-            <Link href="/dashboard/notifications" className="rounded-lg border border-input bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent">
+            <button type="button" onClick={() => openNotification(toast)} className="rounded-lg border border-input bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent">
               Open
-            </Link>
+            </button>
             <button type="button" onClick={() => markRead(toast.id)} className="rounded-lg bg-neutral-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800">
               Mark read
             </button>
