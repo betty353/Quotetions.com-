@@ -40,7 +40,7 @@ export default function ProductsTable({ products }: { products: Product[] }) {
 
   async function handleDeleteSelected() {
     if (selectedIds.length === 0) return
-    if (!confirm(`Delete ${selectedIds.length} products? This cannot be undone.`)) return
+    if (!confirm(`Discontinue ${selectedIds.length} products? They will be hidden from the store, but history stays safe.`)) return
     setProcessing(true)
     try {
       for (const id of selectedIds) {
@@ -49,22 +49,22 @@ export default function ProductsTable({ products }: { products: Product[] }) {
       location.reload()
     } catch (err) {
       console.error(err)
-      alert("Failed to delete some items")
+      alert("Failed to discontinue some items")
     } finally {
       setProcessing(false)
     }
   }
 
   async function handleDeleteOne(id: string, name: string) {
-    if (!confirm(`Remove ${name} from active products? Existing quotations will stay safe.`)) return
+    if (!confirm(`Discontinue ${name}? It will be hidden from active products, but existing quotations stay safe.`)) return
     setProcessing(true)
     try {
       const res = await fetch(`/api/products/${id}`, { method: "DELETE", credentials: "include" })
-      if (!res.ok) throw new Error("Failed to remove product")
+      if (!res.ok) throw new Error("Failed to discontinue product")
       location.reload()
     } catch (err) {
       console.error(err)
-      alert("Failed to remove product")
+      alert("Failed to discontinue product")
     } finally {
       setProcessing(false)
     }
@@ -105,7 +105,7 @@ export default function ProductsTable({ products }: { products: Product[] }) {
         <button onClick={selectAll} className="px-3 py-1 bg-slate-100 rounded">Select All</button>
         <button onClick={clearAll} className="px-3 py-1 bg-slate-100 rounded">Clear</button>
         <button onClick={exportSelected} className="px-3 py-1 bg-white border rounded">Export Selected</button>
-        <button onClick={handleDeleteSelected} disabled={processing} className="px-3 py-1 bg-red-600 text-white rounded">{processing ? 'Processing...' : 'Delete Selected'}</button>
+        <button onClick={handleDeleteSelected} disabled={processing} className="px-3 py-1 bg-red-600 text-white rounded">{processing ? 'Processing...' : 'Discontinue Selected'}</button>
         <Link href="/dashboard/products/new" className="ml-auto rounded bg-primary px-3 py-1 text-primary-foreground hover:bg-primary/90">Add Product</Link>
       </div>
 
@@ -155,7 +155,7 @@ export default function ProductsTable({ products }: { products: Product[] }) {
                       onClick={() => handleDeleteOne(p.id, p.name)}
                       className="text-red-600 underline-offset-4 hover:underline disabled:opacity-50"
                     >
-                      Remove
+                      Discontinue
                     </button>
                   </div>
                 </td>

@@ -51,7 +51,7 @@ const initialForm: FormState = {
   quotationPrefix: "QT",
   receiptPrefix: "RC",
   paymentPrefix: "PM",
-  quotationValidDays: 30,
+  quotationValidDays: 7,
 }
 
 export default function OnboardingPage() {

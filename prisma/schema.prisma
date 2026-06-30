@@ -295,7 +295,7 @@ model Product {
   description           String?   @db.Text
   categoryId            String
   unitPrice             Decimal   @db.Decimal(12, 2)
-  currency              String    @default("USD")
+  currency              String    @default("ZMW")
   stock                 Int       @default(0)
   reorderLevel          Int?
   image                 String?
@@ -501,7 +501,7 @@ model ProductImportHistory {
 model Quotation {
   id                    String    @id @default(cuid())
   companyId             String?
-  quotationNumber       String    @unique
+  quotationNumber       String
   customerId            String
   createdById           String
   assignedEmployeeId    String?
@@ -510,7 +510,7 @@ model Quotation {
   taxAmount             Decimal   @db.Decimal(12, 2)
   discountAmount        Decimal   @db.Decimal(12, 2)
   total                 Decimal   @db.Decimal(12, 2)
-  currency              String    @default("USD")
+  currency              String    @default("ZMW")
   notes                 String?   @db.Text
   terms                 String?   @db.Text
   validUntil            DateTime?
@@ -546,6 +546,7 @@ model Quotation {
   @@index([createdById])
   @@index([assignedEmployeeId])
   @@index([status])
+  @@unique([companyId, quotationNumber])
   @@index([quotationNumber])
 }
 
@@ -580,7 +581,7 @@ model Payment {
   recordedById          String
   method                PaymentMethod
   amount                Decimal   @db.Decimal(12, 2)
-  currency              String    @default("USD")
+  currency              String    @default("ZMW")
   status                PaymentStatus @default(PENDING)
   reference             String?
   notes                 String?   @db.Text
@@ -616,7 +617,7 @@ model Receipt {
   customerId            String
   generatedById         String
   amount                Decimal   @db.Decimal(12, 2)
-  currency              String    @default("USD")
+  currency              String    @default("ZMW")
   paymentMethod         PaymentMethod
   reference             String?
   notes                 String?   @db.Text
@@ -783,12 +784,13 @@ model CompanySetting {
   companyPostalCode     String?
   companyTaxId          String?
   companyRegistration   String?
-  defaultCurrency       String    @default("USD")
+  defaultCurrency       String    @default("ZMW")
   taxRate               Float     @default(0)
   quotationPrefix       String    @default("QT")
   receiptPrefix         String    @default("RC")
   paymentPrefix         String    @default("PM")
-  quotationValidDays    Int       @default(30)
+  quotationValidDays    Int       @default(7)
+  termsAndConditions    String?   @db.Text
   bankName              String?
   bankAccount           String?
   bankCode              String?

@@ -1,6 +1,6 @@
 "use client"
 
-import { FormEvent, useState } from "react"
+import { ChangeEvent, FormEvent, useState } from "react"
 import { useRouter } from "next/navigation"
 import { UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,37 @@ export default function CreateCustomerForm() {
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [passportPhotoUrl, setPassportPhotoUrl] = useState("")
+  const [uploading, setUploading] = useState(false)
+
+  async function uploadImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+    setUploading(true)
+    setError("")
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ""))
+        reader.onerror = () => reject(reader.error)
+        reader.readAsDataURL(file)
+      })
+      const res = await fetch("/api/uploads/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ base64Image: dataUrl, folder: "astro-city/customers" }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Upload failed")
+      setPassportPhotoUrl(json.data?.secure_url || json.data?.url || "")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image upload failed")
+    } finally {
+      setUploading(false)
+    }
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -21,7 +52,7 @@ export default function CreateCustomerForm() {
     setError("")
 
     const form = new FormData(event.currentTarget)
-    const payload = Object.fromEntries(form.entries())
+    const payload = { ...Object.fromEntries(form.entries()), passportPhotoUrl }
     const res = await fetch("/api/customers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -37,6 +68,7 @@ export default function CreateCustomerForm() {
     }
 
     event.currentTarget.reset()
+    setPassportPhotoUrl("")
     setMessage(`Customer created. Temporary password: ${json.data.temporaryPassword}`)
     router.refresh()
   }
@@ -56,12 +88,17 @@ export default function CreateCustomerForm() {
           <div><Label>Email</Label><Input name="email" type="email" required /></div>
           <div><Label>Phone</Label><Input name="phone" required /></div>
           <div><Label>NRC</Label><Input name="nrc" /></div>
-          <div><Label>Village</Label><Input name="village" /></div>
+          <div><Label>Passport Photo URL</Label><Input name="passportPhotoUrl" value={passportPhotoUrl} onChange={(event) => setPassportPhotoUrl(event.target.value)} /></div>
           <div><Label>Town</Label><Input name="town" /></div>
           <div><Label>WhatsApp</Label><Input name="whatsappNumber" /></div>
-          <div className="md:col-span-2"><Label>Address</Label><Input name="address" /></div>
-          <div><Label>City</Label><Input name="city" /></div>
+          <div className="md:col-span-2"><Label>Village / House Number</Label><Input name="address" /></div>
+          <div><Label>Province</Label><Input name="region" /></div>
           <div><Label>Country</Label><Input name="country" /></div>
+          <div className="md:col-span-2">
+            <Label>Upload Customer Image</Label>
+            <input type="file" accept="image/*" onChange={uploadImage} disabled={uploading} className="mt-2 block w-full text-sm text-slate-600" />
+            {uploading && <p className="mt-1 text-xs text-muted-foreground">Uploading...</p>}
+          </div>
           <div className="md:col-span-4">
             <Button type="submit" disabled={loading}>{loading ? "Creating..." : "Create Customer"}</Button>
           </div>

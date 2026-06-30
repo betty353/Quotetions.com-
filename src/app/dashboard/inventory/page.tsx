@@ -131,7 +131,7 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
 
       <div className="grid gap-4 md:grid-cols-4">
         <Metric title="Total Stock" value={String(totalStock)} icon={<PackageCheck className="h-5 w-5 text-emerald-600" />} />
-        <Metric title="Stock Value" value={formatCurrency(stockValue, products[0]?.currency || "USD")} icon={<PackagePlus className="h-5 w-5 text-blue-600" />} />
+        <Metric title="Stock Value" value={formatCurrency(stockValue, "ZMW")} icon={<PackagePlus className="h-5 w-5 text-blue-600" />} />
         <Metric title="Stock In / Out" value={`${stockIn} / ${stockOut}`} icon={<PackageMinus className="h-5 w-5 text-violet-600" />} />
         <Metric title="Damaged / Lost" value={`${damaged} / ${lost}`} icon={<TriangleAlert className="h-5 w-5 text-red-600" />} />
       </div>

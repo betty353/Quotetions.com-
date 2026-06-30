@@ -14,7 +14,26 @@ export async function GET(
     where: { id },
     include: {
       quotation: true,
-      customer: { include: { user: true } },
+      customer: {
+        include: {
+          user: true,
+          quotations: {
+            orderBy: { createdAt: "desc" },
+            take: 8,
+            select: { quotationNumber: true, status: true, total: true, currency: true, createdAt: true },
+          },
+          payments: {
+            orderBy: { paymentDate: "desc" },
+            take: 8,
+            select: { paymentNumber: true, status: true, amount: true, currency: true, paymentDate: true },
+          },
+          receipts: {
+            orderBy: { createdAt: "desc" },
+            take: 8,
+            select: { receiptNumber: true, amount: true, currency: true, createdAt: true },
+          },
+        },
+      },
       generatedBy: true,
       payment: true,
       company: { include: { settings: true } },

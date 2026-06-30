@@ -50,7 +50,7 @@ const sidebarItems = [
   { icon: FileText, iconColor: "text-sky-600", label: "Quotations", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: Percent, iconColor: "text-orange-600", label: "Discount Requests", href: "/dashboard/discount-requests", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: ShoppingCart, iconColor: "text-orange-600", label: "Orders", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
-  { icon: WalletCards, iconColor: "text-indigo-600", label: "Invoices", href: "/dashboard/invoices", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
+  { icon: WalletCards, iconColor: "text-indigo-600", label: "Invoices", href: "/dashboard/invoices", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: Receipt, iconColor: "text-rose-600", label: "Receipts", href: "/dashboard/receipts", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: CreditCard, iconColor: "text-cyan-600", label: "Payments", href: "/dashboard/payments", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: BarChart3, iconColor: "text-lime-600", label: "Reports", href: "/dashboard/reports", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },

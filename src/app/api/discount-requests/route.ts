@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
+import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import requireRole from "@/lib/roles"
 import { discountRequestDecisionSchema } from "@/lib/schemas"
-import { generateQuotationNumber } from "@/lib/utils"
 import { createActivityLog, createAuditLog } from "@/lib/finance"
+import { generateNextQuotationNumber, quotationValidUntil } from "@/lib/quotation-number"
 
 export async function GET() {
   const session = await requireRole("ADMIN")
@@ -59,12 +60,17 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ data: rejected })
   }
 
-  const setting = await prisma.companySetting.findUnique({ where: { companyId }, select: { quotationPrefix: true, defaultCurrency: true } })
-  const count = await prisma.quotation.count({ where: { companyId } })
-  const quotationNumber = generateQuotationNumber(setting?.quotationPrefix || "QT", count + 1)
+  const setting = await prisma.companySetting.findUnique({
+    where: { companyId },
+    select: { quotationPrefix: true, defaultCurrency: true, quotationValidDays: true, termsAndConditions: true },
+  })
   const items = Array.isArray(discountRequest.items) ? discountRequest.items as any[] : []
 
-  const quotation = await prisma.$transaction(async (tx) => {
+  let quotation = null
+  for (let attempt = 1; attempt <= 25; attempt += 1) {
+    const quotationNumber = await generateNextQuotationNumber(prisma, companyId, setting?.quotationPrefix || "QT", attempt)
+    try {
+      quotation = await prisma.$transaction(async (tx) => {
     const created = await tx.quotation.create({
       data: {
         companyId,
@@ -73,13 +79,13 @@ export async function PATCH(request: NextRequest) {
         createdById: discountRequest.requestedById,
         status: "SENT",
         notes: discountRequest.notes,
-        terms: discountRequest.terms,
-        validUntil: discountRequest.validUntil,
+        terms: discountRequest.terms || setting?.termsAndConditions || null,
+        validUntil: discountRequest.validUntil || quotationValidUntil(setting?.quotationValidDays || 7),
         subtotal: discountRequest.subtotal,
         taxAmount: 0,
         discountAmount: discountRequest.discountAmount,
         total: discountRequest.total,
-        currency: setting?.defaultCurrency || "USD",
+        currency: "ZMW",
         items: {
           create: items.map((item) => ({
             productId: item.productId,
@@ -104,7 +110,17 @@ export async function PATCH(request: NextRequest) {
       },
     })
     return created
-  })
+      })
+      break
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") continue
+      throw error
+    }
+  }
+
+  if (!quotation) {
+    return NextResponse.json({ error: "Could not allocate quotation number. Please try again." }, { status: 409 })
+  }
 
   await createActivityLog({
     companyId,

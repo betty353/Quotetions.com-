@@ -40,7 +40,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         description: validated.description || null,
         categoryId: validated.categoryId,
         unitPrice: validated.unitPrice,
-        currency: validated.currency || "USD",
+        currency: "ZMW",
         stock: validated.stock ?? 0,
         reorderLevel: validated.reorderLevel ?? null,
         image: validated.image ?? null,
@@ -105,7 +105,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     await createAuditLog({
       companyId: existing.companyId,
       userId: session.user.id,
-      action: "DELETE",
+      action: "DISCONTINUE",
       entity: "Product",
       entityId: existing.id,
       changes: {
@@ -116,9 +116,9 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
       },
     })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, message: "Product discontinued. Existing quotations and history are preserved." })
   } catch (err) {
     console.error(err)
-    return NextResponse.json({ error: "Failed to delete product" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to discontinue product" }, { status: 500 })
   }
 }

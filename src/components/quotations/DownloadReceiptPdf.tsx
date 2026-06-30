@@ -47,8 +47,8 @@ function clean(value: unknown, fallback = "-") {
   return text || fallback
 }
 
-function money(value: unknown, currency = "USD") {
-  return new Intl.NumberFormat("en-US", {
+function money(value: unknown, currency = "ZMW") {
+  return new Intl.NumberFormat("en-ZM", {
     style: "currency",
     currency,
     minimumFractionDigits: 2,
@@ -168,6 +168,66 @@ function drawDetailRow(doc: jsPDF, label: string, value: string, x: number, y: n
   doc.text(doc.splitTextToSize(value, width - 24), x + 12, y + 31)
 }
 
+function drawCustomerHistory(doc: jsPDF, setting: PdfSetting, logoData: string | null, customer: any, currency: string) {
+  if (!customer) return
+  doc.addPage()
+  drawShell(doc, setting, logoData, "Customer history")
+  let y = 124
+  doc.setFont("Helvetica", "bold")
+  doc.setFontSize(14)
+  doc.setTextColor(17, 24, 39)
+  doc.text(customer.companyName || customer.contactPerson || customer.user?.email || "Customer", 40, y)
+  y += 26
+
+  const rows = [
+    ...(customer.quotations || []).map((item: any) => ({
+      type: "Quotation",
+      number: item.quotationNumber,
+      status: item.status,
+      amount: money(item.total, currency),
+      date: new Date(item.createdAt).toLocaleDateString(),
+    })),
+    ...(customer.payments || []).map((item: any) => ({
+      type: "Payment",
+      number: item.paymentNumber,
+      status: item.status,
+      amount: money(item.amount, currency),
+      date: new Date(item.paymentDate).toLocaleDateString(),
+    })),
+    ...(customer.receipts || []).map((item: any) => ({
+      type: "Receipt",
+      number: item.receiptNumber,
+      status: "Issued",
+      amount: money(item.amount, currency),
+      date: new Date(item.createdAt).toLocaleDateString(),
+    })),
+  ].slice(0, 18)
+
+  doc.setFont("Helvetica", "bold")
+  doc.setFontSize(9)
+  doc.setTextColor(100, 116, 139)
+  doc.text("TYPE", 40, y)
+  doc.text("NUMBER", 130, y)
+  doc.text("STATUS", 280, y)
+  doc.text("AMOUNT", 380, y)
+  doc.text("DATE", 490, y)
+  y += 14
+
+  doc.setFont("Helvetica", "normal")
+  doc.setFontSize(9)
+  doc.setTextColor(17, 24, 39)
+  rows.forEach((row, index) => {
+    doc.setFillColor(index % 2 === 0 ? 248 : 255, index % 2 === 0 ? 250 : 255, index % 2 === 0 ? 252 : 255)
+    doc.rect(40, y - 10, 515, 22, "F")
+    doc.text(row.type, 44, y + 4)
+    doc.text(String(row.number || "-"), 130, y + 4)
+    doc.text(String(row.status || "-"), 280, y + 4)
+    doc.text(String(row.amount || "-"), 380, y + 4)
+    doc.text(String(row.date || "-"), 490, y + 4)
+    y += 24
+  })
+}
+
 function normalizeSetting(receipt: any, fallback: PdfSetting): PdfSetting {
   const company = receipt.company || {}
   const setting = company.settings || fallback || {}
@@ -224,7 +284,7 @@ export default function DownloadReceiptPdf({ receiptId }: Props) {
       drawShell(doc, setting, logoData, receipt.receiptNumber || "Receipt")
 
       const pageWidth = doc.internal.pageSize.getWidth()
-      const currency = receipt.currency || receipt.quotation?.currency || settingsJson.data?.defaultCurrency || "USD"
+      const currency = "ZMW"
       const customerName = receipt.customer?.companyName || receipt.customer?.contactPerson || "Customer"
       const address = companyAddress(setting)
 
@@ -308,6 +368,8 @@ export default function DownloadReceiptPdf({ receiptId }: Props) {
       doc.setTextColor(100, 116, 139)
       doc.setFontSize(9)
       doc.text("This receipt confirms that the payment above was recorded for the referenced quotation.", 60, 730)
+
+      drawCustomerHistory(doc, setting, logoData, receipt.customer, currency)
 
       doc.save(`${receipt.receiptNumber || "receipt"}.pdf`)
     } catch (err) {

@@ -16,8 +16,16 @@ export default async function QuotationsPage() {
   const customer = role === "CUSTOMER"
     ? await prisma.customer.findUnique({ where: { userId: session.user.id } })
     : null
-  const where = role === "CUSTOMER"
-    ? customer ? { customerId: customer.id } : { id: "__none__" }
+  const where: any = role === "CUSTOMER"
+    ? customer ? {
+        customerId: customer.id,
+        OR: [
+          { validUntil: null },
+          { validUntil: { gte: new Date() } },
+          { paymentStatus: "COMPLETED" },
+          { status: "COMPLETED" },
+        ],
+      } : { id: "__none__" }
     : companyId ? { companyId } : {}
 
   const [quotations, statusGroups] = await Promise.all([
@@ -33,12 +41,12 @@ export default async function QuotationsPage() {
     prisma.quotation.groupBy({
       where,
       by: ["status"],
-      _count: { status: true },
+      _count: true,
     }),
   ])
 
   const statusCounts = Object.fromEntries(
-    statusGroups.map((group) => [group.status, group._count.status])
+    statusGroups.map((group) => [group.status, group._count])
   ) as Record<string, number>
 
   return (

@@ -7,6 +7,7 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import Link from "next/link"
 import { TrendingUp, Users, FileText, CreditCard, Receipt, Store } from "lucide-react"
 import { isCompanyAdminRole } from "@/lib/tenant"
+import CustomerProfileForm from "@/components/customers/CustomerProfileForm"
 
 async function getDashboardData(userId: string, userRole: string, companyId?: string | null) {
   if (isCompanyAdminRole(userRole)) {
@@ -98,6 +99,7 @@ async function getDashboardData(userId: string, userRole: string, companyId?: st
     // Customer Dashboard
     const customer = await prisma.customer.findUnique({
       where: { userId },
+      include: { user: true },
     })
 
     if (!customer) {
@@ -113,7 +115,15 @@ async function getDashboardData(userId: string, userRole: string, companyId?: st
         _sum: { total: true },
       }),
       prisma.quotation.findMany({
-        where: { customerId: customer.id },
+        where: {
+          customerId: customer.id,
+          OR: [
+            { validUntil: null },
+            { validUntil: { gte: new Date() } },
+            { paymentStatus: "COMPLETED" },
+            { status: "COMPLETED" },
+          ],
+        },
         take: 5,
         orderBy: { createdAt: "desc" },
       }),
@@ -138,6 +148,7 @@ async function getDashboardData(userId: string, userRole: string, companyId?: st
       paymentCount,
       receiptCount,
       company,
+      customer,
     }
   }
 }
@@ -387,6 +398,9 @@ export default async function DashboardPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+      {customerData.customer && (
+        <CustomerProfileForm customer={customerData.customer} />
       )}
       {customerData.recentQuotations?.length === 0 && (
         <Card className="text-center py-12">

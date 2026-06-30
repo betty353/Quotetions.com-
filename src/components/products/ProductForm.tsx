@@ -23,7 +23,7 @@ export default function ProductForm({ categories = [], initial = {}, mode = "cre
   const [description, setDescription] = useState(initial.description || "")
   const [categoryId, setCategoryId] = useState(initial.categoryId || (categories[0]?.id ?? ""))
   const [unitPrice, setUnitPrice] = useState(initial.unitPrice ? String(initial.unitPrice) : "0")
-  const [currency, setCurrency] = useState(initial.currency || "USD")
+  const [currency] = useState("ZMW")
   const [stock, setStock] = useState(initial.stock ?? 0)
   const [imageUrl, setImageUrl] = useState(initial.image || "")
   const [galleryText, setGalleryText] = useState<string>(Array.isArray(initial.images) ? initial.images.join("\n") : "")
@@ -156,7 +156,7 @@ export default function ProductForm({ categories = [], initial = {}, mode = "cre
         </div>
         <div>
           <Label htmlFor="currency">Currency</Label>
-          <Input id="currency" value={currency} onChange={(e) => setCurrency(e.target.value)} />
+          <Input id="currency" value={currency} readOnly />
         </div>
       </div>
 

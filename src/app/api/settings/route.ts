@@ -30,12 +30,13 @@ export async function GET() {
         companyRegistration: company?.registrationNumber || null,
         companyWebsite: company?.website || null,
         companyLogo: company?.logoUrl || null,
-        defaultCurrency: "USD",
+        defaultCurrency: "ZMW",
         taxRate: 0,
         quotationPrefix: "QT",
         receiptPrefix: "RC",
         paymentPrefix: "PM",
-        quotationValidDays: 30,
+        quotationValidDays: 7,
+        termsAndConditions: "",
         documentFont: "Helvetica",
       },
     })
@@ -66,6 +67,9 @@ export async function PUT(request: NextRequest) {
       companyWebsite: validated.companyWebsite || null,
       companyLogo: validated.companyLogo || null,
       signatureImageUrl: validated.signatureImageUrl || null,
+      termsAndConditions: validated.termsAndConditions || null,
+      defaultCurrency: "ZMW",
+      quotationValidDays: 7,
     }
 
     const result = await prisma.$transaction(async (tx) => {

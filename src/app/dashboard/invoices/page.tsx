@@ -16,7 +16,7 @@ export default async function InvoicesPage() {
 
   const role = (session.user as any).role
   const companyId = (session.user as any).companyId as string | null
-  if (!isCompanyAdminRole(role) && role !== "EMPLOYEE") redirect("/dashboard")
+  if (!isCompanyAdminRole(role)) redirect("/dashboard")
 
   const where: any = {}
   if (companyId) {

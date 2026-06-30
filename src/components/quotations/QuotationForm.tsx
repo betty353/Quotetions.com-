@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ApiResponse, CreateQuotationInput } from "@/types"
+import { formatCurrency } from "@/lib/utils"
 
 interface ProductOption {
   id: string
@@ -60,8 +61,9 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
       (acc, item) => {
         const product = products.find((p) => p.id === item.productId)
         const unitPrice = product ? Number(product.unitPrice) : 0
-        const subtotal = item.quantity * unitPrice
-        const discount = item.discount || 0
+        const quantity = Number(item.quantity) || 0
+        const subtotal = quantity * unitPrice
+        const discount = Number(item.discount) || 0
         acc.subtotal += subtotal
         acc.discount += discount
         acc.total += Math.max(0, subtotal - discount)
@@ -147,7 +149,7 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
 
         <div className="space-y-4">
           {fields.map((field, index) => (
-            <div key={field.id} className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-4">
+            <div key={field.id} className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-5">
               <div className="sm:col-span-2">
                 <Label>Product</Label>
                 <select {...register(`items.${index}.productId` as const)} className="w-full rounded border p-2">
@@ -174,6 +176,13 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
                 {isCustomer && <p className="mt-1 text-xs text-muted-foreground">Discounts are handled by the company.</p>}
               </div>
 
+              <div>
+                <Label>Line Total</Label>
+                <div className="flex h-10 items-center rounded-md border bg-white px-3 text-sm font-semibold">
+                  {formatCurrency(Math.max(0, (Number(watchedItems[index]?.quantity) || 0) * Number(products.find((product) => product.id === watchedItems[index]?.productId)?.unitPrice || 0) - (Number(watchedItems[index]?.discount) || 0)))}
+                </div>
+              </div>
+
               <div className="flex items-end justify-end">
                 <Button type="button" variant="destructive" onClick={() => remove(index)}>
                   Remove
@@ -187,15 +196,15 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs text-muted-foreground">Subtotal</p>
-          <p className="mt-2 text-xl font-semibold">${totals.subtotal.toFixed(2)}</p>
+          <p className="mt-2 text-xl font-semibold">{formatCurrency(totals.subtotal)}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs text-muted-foreground">Discount</p>
-          <p className="mt-2 text-xl font-semibold">-${totals.discount.toFixed(2)}</p>
+          <p className="mt-2 text-xl font-semibold">-{formatCurrency(totals.discount)}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs text-muted-foreground">Total</p>
-          <p className="mt-2 text-xl font-semibold">${totals.total.toFixed(2)}</p>
+          <p className="mt-2 text-xl font-semibold">{formatCurrency(totals.total)}</p>
         </div>
       </div>
 
@@ -204,10 +213,19 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
         <Textarea id="notes" {...register("notes")} rows={4} />
       </div>
 
+      {!isCustomer && (
       <div>
         <Label htmlFor="terms">Terms</Label>
         <Textarea id="terms" {...register("terms")} rows={4} />
       </div>
+      )}
+
+      {isCustomer && (
+        <label className="flex items-start gap-3 rounded-lg border bg-slate-50 p-3 text-sm">
+          <input type="checkbox" required className="mt-1 h-4 w-4 rounded border-slate-300" />
+          <span>I agree to the company terms and conditions attached to this quotation request. The generated quotation will be valid for 7 days.</span>
+        </label>
+      )}
 
       <div className="flex items-center gap-2">
         <Button type="submit">Create Quotation</Button>

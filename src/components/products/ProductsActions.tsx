@@ -73,7 +73,7 @@ export default function ProductsActions() {
         description: d.description || d.Description || "",
         category: d.category || d.Category || "",
         unitPrice: Number(d.unitPrice || d.UnitPrice || d.price || 0),
-        currency: d.currency || d.Currency || "USD",
+        currency: "ZMW",
         stock: Number(d.stock || d.Stock || 0),
         image: d.image || d.Image || "",
         status: d.status || d.Status || "ACTIVE",

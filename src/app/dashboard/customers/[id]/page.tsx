@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import SafeImage from "@/components/ui/safe-image"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
+import RemoveCustomerButton from "@/components/customers/RemoveCustomerButton"
+import CustomerProfileForm from "@/components/customers/CustomerProfileForm"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -68,7 +70,10 @@ export default async function CustomerDetailPage({ params }: Props) {
           <h1 className="mt-2 text-3xl font-bold">{name}</h1>
           <p className="text-sm text-muted-foreground">Full customer profile, identity details, contact links, quotations, and activity.</p>
         </div>
-        <Badge variant={customer.status === "ACTIVE" ? "success" : "warning"}>{customer.status}</Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={customer.status === "ACTIVE" ? "success" : "warning"}>{customer.status}</Badge>
+          {isCompanyAdminRole(role) && <RemoveCustomerButton customerId={customer.id} customerName={name} />}
+        </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1.4fr]">
@@ -96,8 +101,8 @@ export default async function CustomerDetailPage({ params }: Props) {
             <div className="grid gap-3 sm:grid-cols-2">
               <Info label="Village" value={customer.village || "Not captured"} />
               <Info label="Town" value={customer.town || customer.city || "Not captured"} />
-              <Info label="City" value={customer.city || "Not captured"} />
-              <Info label="Region" value={customer.region || "Not captured"} />
+              <Info label="Province" value={customer.region || customer.city || "Not captured"} />
+              <Info label="Village / House Number" value={customer.address || "Not captured"} />
               <Info label="Country" value={customer.country || "Not captured"} />
               <Info label="Postal Code" value={customer.postalCode || "Not captured"} />
             </div>
@@ -134,6 +139,8 @@ export default async function CustomerDetailPage({ params }: Props) {
           </CardContent>
         </Card>
       </div>
+
+      <CustomerProfileForm customer={customer} editableByStaff />
 
       <Card>
         <CardHeader>

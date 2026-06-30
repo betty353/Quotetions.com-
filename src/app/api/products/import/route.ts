@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
             description: item.description || null,
             category: { connect: { id: categoryId } },
             unitPrice: item.unitPrice ?? 0,
-            currency: item.currency || "USD",
+            currency: "ZMW",
             stock: item.stock ?? 0,
             image: item.image || null,
             status: item.status || "ACTIVE",

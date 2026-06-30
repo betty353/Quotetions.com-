@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
+import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { createQuotationSchema } from "@/lib/schemas"
 import requireRole from "@/lib/roles"
-import { generateQuotationNumber } from "@/lib/utils"
 import { ZodError } from "zod"
 import { createActivityLog, createAuditLog } from "@/lib/finance"
 import { isCompanyAdminRole } from "@/lib/tenant"
+import { generateNextQuotationNumber, quotationValidUntil } from "@/lib/quotation-number"
 
 export async function GET(request: NextRequest) {
   const session = await requireRole("ADMIN", "EMPLOYEE", "CUSTOMER")
@@ -28,6 +29,12 @@ export async function GET(request: NextRequest) {
     const customer = await prisma.customer.findUnique({ where: { userId: session.user.id } })
     if (!customer) return NextResponse.json({ error: "Customer profile not found" }, { status: 404 })
     where.customerId = customer.id
+    where.OR = [
+      { validUntil: null },
+      { validUntil: { gte: new Date() } },
+      { paymentStatus: "COMPLETED" },
+      { status: "COMPLETED" },
+    ]
   } else if (sessionCompanyId) {
     where.companyId = sessionCompanyId
   } else {
@@ -127,6 +134,11 @@ export async function POST(request: NextRequest) {
     const taxAmount = 0
     const totalAmount = itemData.reduce((sum, item) => sum + item.total, 0)
 
+    const setting = await prisma.companySetting.findUnique({
+      where: { companyId },
+      select: { quotationPrefix: true, defaultCurrency: true, quotationValidDays: true, termsAndConditions: true },
+    })
+
     if (role === "EMPLOYEE" && discountAmount > 0) {
       const request = await prisma.discountRequest.create({
         data: {
@@ -136,8 +148,8 @@ export async function POST(request: NextRequest) {
           status: "PENDING",
           items: itemData,
           notes: validated.notes || null,
-          terms: validated.terms || null,
-          validUntil: validated.validUntil || null,
+          terms: validated.terms || setting?.termsAndConditions || null,
+          validUntil: validated.validUntil || quotationValidUntil(setting?.quotationValidDays || 7),
           subtotal,
           discountAmount,
           total: totalAmount,
@@ -178,35 +190,45 @@ export async function POST(request: NextRequest) {
     if (!isCompanyAdminRole(role) && discountAmount > 0) {
       return NextResponse.json({ error: "Discounts require admin approval." }, { status: 403 })
     }
-    const setting = await prisma.companySetting.findUnique({ where: { companyId }, select: { quotationPrefix: true, defaultCurrency: true } })
-    const count = await prisma.quotation.count({ where: { companyId } })
-    const quotationNumber = generateQuotationNumber(setting?.quotationPrefix || "QT", count + 1)
+    let quotation = null
+    for (let attempt = 1; attempt <= 25; attempt += 1) {
+      const quotationNumber = await generateNextQuotationNumber(prisma, companyId, setting?.quotationPrefix || "QT", attempt)
+      try {
+        quotation = await prisma.quotation.create({
+          data: {
+            companyId,
+            quotationNumber,
+            customerId,
+            createdById: session.user.id,
+            assignedEmployeeId: null,
+            status: "SENT",
+            notes: validated.notes || null,
+            terms: validated.terms || setting?.termsAndConditions || null,
+            validUntil: validated.validUntil || quotationValidUntil(setting?.quotationValidDays || 7),
+            subtotal,
+            taxAmount,
+            discountAmount,
+            total: totalAmount,
+            currency: "ZMW",
+            items: {
+              create: itemData,
+            },
+          },
+          include: {
+            customer: { include: { user: true } },
+            items: true,
+          },
+        })
+        break
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") continue
+        throw error
+      }
+    }
 
-    const quotation = await prisma.quotation.create({
-      data: {
-        companyId,
-        quotationNumber,
-        customerId,
-        createdById: session.user.id,
-        assignedEmployeeId: null,
-        status: "SENT",
-        notes: validated.notes || null,
-        terms: validated.terms || null,
-        validUntil: validated.validUntil || null,
-        subtotal,
-        taxAmount,
-        discountAmount,
-        total: totalAmount,
-        currency: setting?.defaultCurrency || "USD",
-        items: {
-          create: itemData,
-        },
-      },
-      include: {
-        customer: { include: { user: true } },
-        items: true,
-      },
-    })
+    if (!quotation) {
+      return NextResponse.json({ error: "Could not allocate quotation number. Please try again." }, { status: 409 })
+    }
 
     await createActivityLog({
       companyId,

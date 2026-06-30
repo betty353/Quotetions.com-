@@ -20,7 +20,7 @@ export default async function CustomersPage() {
   if (!companyId) redirect("/dashboard")
 
   const customers = await prisma.customer.findMany({
-    where: { companyId },
+    where: { companyId, status: { not: "REMOVED" } },
     orderBy: { updatedAt: "desc" },
     include: {
       user: true,

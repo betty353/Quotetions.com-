@@ -146,7 +146,7 @@ export default async function ProductsPage({ searchParams }: { searchParams?: Pr
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Stock Value</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{stockValue.toLocaleString(undefined, { style: "currency", currency: products[0]?.currency || "USD" })}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold">{stockValue.toLocaleString("en-ZM", { style: "currency", currency: "ZMW" })}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Sold Out</CardTitle></CardHeader>

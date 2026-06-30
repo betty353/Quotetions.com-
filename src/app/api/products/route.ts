@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         description: validated.description || null,
         categoryId: validated.categoryId,
         unitPrice: validated.unitPrice,
-        currency: validated.currency || "USD",
+        currency: "ZMW",
         stock: validated.stock ?? 0,
         reorderLevel: validated.reorderLevel ?? null,
         image: validated.image ?? null,

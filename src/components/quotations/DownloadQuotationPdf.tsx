@@ -42,8 +42,8 @@ function imageType(dataUrl: string) {
   return dataUrl.startsWith("data:image/jpeg") || dataUrl.startsWith("data:image/jpg") ? "JPEG" : "PNG"
 }
 
-function money(value: unknown, currency = "USD") {
-  return new Intl.NumberFormat("en-US", {
+function money(value: unknown, currency = "ZMW") {
+  return new Intl.NumberFormat("en-ZM", {
     style: "currency",
     currency,
     minimumFractionDigits: 2,
@@ -174,6 +174,66 @@ function drawInfoBox(doc: jsPDF, title: string, lines: string[], x: number, y: n
   })
 }
 
+function drawCustomerHistory(doc: jsPDF, setting: PdfSetting, logoData: string | null, customer: any, currency: string) {
+  if (!customer) return
+  doc.addPage()
+  drawShell(doc, setting, logoData, "CUSTOMER HISTORY", customer.contactPerson || customer.companyName || "Customer")
+  let y = 124
+  doc.setFont("Helvetica", "bold")
+  doc.setFontSize(14)
+  doc.setTextColor(17, 24, 39)
+  doc.text(customer.companyName || customer.contactPerson || customer.user?.email || "Customer", 40, y)
+  y += 26
+
+  const rows = [
+    ...(customer.quotations || []).map((item: any) => ({
+      type: "Quotation",
+      number: item.quotationNumber,
+      status: item.status,
+      amount: money(item.total, currency),
+      date: new Date(item.createdAt).toLocaleDateString(),
+    })),
+    ...(customer.payments || []).map((item: any) => ({
+      type: "Payment",
+      number: item.paymentNumber,
+      status: item.status,
+      amount: money(item.amount, currency),
+      date: new Date(item.paymentDate).toLocaleDateString(),
+    })),
+    ...(customer.receipts || []).map((item: any) => ({
+      type: "Receipt",
+      number: item.receiptNumber,
+      status: "Issued",
+      amount: money(item.amount, currency),
+      date: new Date(item.createdAt).toLocaleDateString(),
+    })),
+  ].slice(0, 18)
+
+  doc.setFont("Helvetica", "bold")
+  doc.setFontSize(9)
+  doc.setTextColor(100, 116, 139)
+  doc.text("TYPE", 40, y)
+  doc.text("NUMBER", 130, y)
+  doc.text("STATUS", 280, y)
+  doc.text("AMOUNT", 380, y)
+  doc.text("DATE", 490, y)
+  y += 14
+
+  doc.setFont("Helvetica", "normal")
+  doc.setFontSize(9)
+  doc.setTextColor(17, 24, 39)
+  rows.forEach((row, index) => {
+    doc.setFillColor(index % 2 === 0 ? 248 : 255, index % 2 === 0 ? 250 : 255, index % 2 === 0 ? 252 : 255)
+    doc.rect(40, y - 10, 515, 22, "F")
+    doc.text(row.type, 44, y + 4)
+    doc.text(String(row.number || "-"), 130, y + 4)
+    doc.text(String(row.status || "-"), 280, y + 4)
+    doc.text(String(row.amount || "-"), 380, y + 4)
+    doc.text(String(row.date || "-"), 490, y + 4)
+    y += 24
+  })
+}
+
 function normalizeSetting(q: any, fallback: PdfSetting): PdfSetting {
   const company = q.company || {}
   const setting = company.settings || fallback || {}
@@ -225,7 +285,7 @@ export default function DownloadQuotationPdf({ quotationId }: Props) {
         }
       }
 
-      const currency = q.currency || settingsJson.data?.defaultCurrency || "USD"
+      const currency = "ZMW"
       drawShell(doc, setting, logoData, "QUOTATION", q.quotationNumber || "Quotation")
 
       const pageWidth = doc.internal.pageSize.getWidth()
@@ -357,6 +417,8 @@ export default function DownloadQuotationPdf({ quotationId }: Props) {
       doc.setFontSize(9)
       doc.setTextColor(100, 116, 139)
       doc.text("Authorized signature", 40, signatureY + 16)
+
+      drawCustomerHistory(doc, setting, logoData, q.customer, currency)
 
       doc.save(`${q.quotationNumber || "quotation"}.pdf`)
     } catch (err) {

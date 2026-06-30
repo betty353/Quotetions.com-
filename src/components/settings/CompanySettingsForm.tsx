@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type Poi
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 const fonts = ["Helvetica", "Times", "Courier"]
@@ -34,12 +35,13 @@ export default function CompanySettingsForm({ setting, companySlug }: CompanySet
     companyPostalCode: setting?.companyPostalCode || "",
     companyTaxId: setting?.companyTaxId || "",
     companyRegistration: setting?.companyRegistration || "",
-    defaultCurrency: setting?.defaultCurrency || "USD",
+    defaultCurrency: "ZMW",
     taxRate: setting?.taxRate ?? 0,
     quotationPrefix: setting?.quotationPrefix || "QT",
     receiptPrefix: setting?.receiptPrefix || "RC",
     paymentPrefix: setting?.paymentPrefix || "PM",
-    quotationValidDays: setting?.quotationValidDays ?? 30,
+    quotationValidDays: 7,
+    termsAndConditions: setting?.termsAndConditions || "",
     companyLogo: setting?.companyLogo || "",
     signatureImageUrl: setting?.signatureImageUrl || "",
     documentFont: setting?.documentFont || "Helvetica",
@@ -68,12 +70,13 @@ export default function CompanySettingsForm({ setting, companySlug }: CompanySet
       companyPostalCode: setting?.companyPostalCode || "",
       companyTaxId: setting?.companyTaxId || "",
       companyRegistration: setting?.companyRegistration || "",
-      defaultCurrency: setting?.defaultCurrency || "USD",
+      defaultCurrency: "ZMW",
       taxRate: setting?.taxRate ?? 0,
       quotationPrefix: setting?.quotationPrefix || "QT",
       receiptPrefix: setting?.receiptPrefix || "RC",
       paymentPrefix: setting?.paymentPrefix || "PM",
-      quotationValidDays: setting?.quotationValidDays ?? 30,
+      quotationValidDays: 7,
+      termsAndConditions: setting?.termsAndConditions || "",
       companyLogo: setting?.companyLogo || "",
       signatureImageUrl: setting?.signatureImageUrl || "",
       documentFont: setting?.documentFont || "Helvetica",
@@ -81,7 +84,7 @@ export default function CompanySettingsForm({ setting, companySlug }: CompanySet
     })
   }, [setting])
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setForm((prev) => ({ ...prev, [name]: name === "taxRate" || name === "quotationValidDays" ? Number(value) : value }))
   }
@@ -401,7 +404,8 @@ export default function CompanySettingsForm({ setting, companySlug }: CompanySet
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="defaultCurrency">Default Currency</Label>
-              <Input id="defaultCurrency" name="defaultCurrency" value={form.defaultCurrency} onChange={handleChange} />
+              <Input id="defaultCurrency" name="defaultCurrency" value={form.defaultCurrency} readOnly />
+              <p className="mt-1 text-xs text-muted-foreground">All amounts use Zambian Kwacha only.</p>
             </div>
             <div>
               <Label htmlFor="taxRate">Tax Rate (%)</Label>
@@ -416,8 +420,21 @@ export default function CompanySettingsForm({ setting, companySlug }: CompanySet
             </div>
             <div>
               <Label htmlFor="quotationValidDays">Quotation Valid Days</Label>
-              <Input id="quotationValidDays" name="quotationValidDays" type="number" value={form.quotationValidDays} onChange={handleChange} />
+              <Input id="quotationValidDays" name="quotationValidDays" type="number" value={form.quotationValidDays} readOnly />
+              <p className="mt-1 text-xs text-muted-foreground">Every generated quotation expires after 7 days.</p>
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="termsAndConditions">Terms and Conditions</Label>
+            <Textarea
+              id="termsAndConditions"
+              name="termsAndConditions"
+              value={form.termsAndConditions}
+              onChange={handleChange}
+              rows={6}
+              placeholder="Add the agreement terms customers must accept before submitting orders or quotation requests."
+            />
           </div>
 
           <Button type="submit">Save Settings</Button>

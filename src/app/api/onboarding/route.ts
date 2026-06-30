@@ -71,12 +71,12 @@ export async function PUT(request: NextRequest) {
       companyRegistration: validated.registrationNumber,
       companyWebsite: validated.website,
       companyLogo: validated.logoUrl,
-      defaultCurrency: validated.defaultCurrency,
+      defaultCurrency: "ZMW",
       taxRate: validated.taxRate,
       quotationPrefix: validated.quotationPrefix,
       receiptPrefix: validated.receiptPrefix,
       paymentPrefix: validated.paymentPrefix,
-      quotationValidDays: validated.quotationValidDays,
+      quotationValidDays: 7,
     }
 
     if (user.companyId) {

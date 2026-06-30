@@ -55,7 +55,7 @@ export const createProductSchema = z.object({
   description: z.string().optional(),
   categoryId: z.string().min(1, "Category is required"),
   unitPrice: z.coerce.number().min(0, "Price must be positive"),
-  currency: z.string().default("USD"),
+  currency: z.literal("ZMW").default("ZMW"),
   stock: z.coerce.number().default(0),
   reorderLevel: z.coerce.number().optional(),
   image: z.string().optional(),
@@ -98,12 +98,13 @@ export const companySettingsSchema = z.object({
   companyPostalCode: z.string().optional(),
   companyTaxId: z.string().optional(),
   companyRegistration: z.string().optional(),
-  defaultCurrency: z.string().default("USD"),
+  defaultCurrency: z.literal("ZMW").default("ZMW"),
   taxRate: z.number().min(0, "Tax rate cannot be negative"),
   quotationPrefix: z.string().min(1, "Quotation prefix is required"),
   receiptPrefix: z.string().min(1, "Receipt prefix is required"),
   paymentPrefix: z.string().min(1, "Payment prefix is required"),
-  quotationValidDays: z.number().int().min(1, "Quotation valid days must be at least 1"),
+  quotationValidDays: z.number().int().min(1, "Quotation valid days must be at least 1").default(7),
+  termsAndConditions: z.string().optional(),
   companyWebsite: z.preprocess((value) => {
     if (value === "") return undefined
     return value
@@ -125,6 +126,23 @@ export const staffCreateCustomerSchema = z.object({
   email: z.string().email("Valid email is required").transform((email) => email.trim().toLowerCase()),
   phone: z.string().trim().min(6, "Phone is required"),
   nrc: z.string().trim().optional(),
+  passportPhotoUrl: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
+  village: z.string().trim().optional(),
+  town: z.string().trim().optional(),
+  whatsappNumber: z.string().trim().optional(),
+  address: z.string().trim().optional(),
+  city: z.string().trim().optional(),
+  region: z.string().trim().optional(),
+  country: z.string().trim().optional(),
+})
+
+export const updateCustomerProfileSchema = z.object({
+  id: z.string().trim().optional(),
+  firstName: z.string().trim().min(2, "First name is required").optional(),
+  lastName: z.string().trim().min(2, "Last name is required").optional(),
+  phone: z.string().trim().min(6, "Phone is required").optional(),
+  nrc: z.string().trim().optional(),
+  passportPhotoUrl: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
   village: z.string().trim().optional(),
   town: z.string().trim().optional(),
   whatsappNumber: z.string().trim().optional(),
@@ -153,12 +171,12 @@ export const onboardingSchema = z.object({
   taxId: z.string().trim().optional(),
   registrationNumber: z.string().trim().optional(),
   website: z.preprocess((value) => value === "" ? undefined : value, z.string().url("Website must be a valid URL").optional()),
-  defaultCurrency: z.string().trim().min(3).max(3).default("USD"),
+  defaultCurrency: z.literal("ZMW").default("ZMW"),
   taxRate: z.coerce.number().min(0, "Tax rate cannot be negative").default(0),
   quotationPrefix: z.string().trim().min(1, "Quotation prefix is required").default("QT"),
   receiptPrefix: z.string().trim().min(1, "Receipt prefix is required").default("RC"),
   paymentPrefix: z.string().trim().min(1, "Payment prefix is required").default("PM"),
-  quotationValidDays: z.coerce.number().int().min(1, "Quotation valid days must be at least 1").default(30),
+  quotationValidDays: z.coerce.number().int().min(1, "Quotation valid days must be at least 1").default(7),
 })
 
 export const createPaymentSchema = z.object({
@@ -251,6 +269,7 @@ export type CreateProductInput = z.infer<typeof createProductSchema>
 export type StockMovementInput = z.infer<typeof stockMovementSchema>
 export type CreateQuotationInput = z.infer<typeof createQuotationSchema>
 export type StaffCreateCustomerInput = z.infer<typeof staffCreateCustomerSchema>
+export type UpdateCustomerProfileInput = z.infer<typeof updateCustomerProfileSchema>
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>
 export type CreateReceiptInput = z.infer<typeof createReceiptSchema>
 export type CreateFollowUpInput = z.infer<typeof createFollowUpSchema>

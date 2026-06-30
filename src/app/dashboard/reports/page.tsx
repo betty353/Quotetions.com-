@@ -76,12 +76,10 @@ export default async function ReportsPage() {
   })
   const productMap = new Map(topProducts.map((product) => [product.id, product]))
 
-  const quotedTotal = quotations.reduce((sum, quotation) => sum + Number(quotation.total), 0)
   const paidTotal = payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
   const receiptedTotal = receipts.reduce((sum, receipt) => sum + Number(receipt.amount), 0)
   const completedCount = quotations.filter((quotation) => quotation.status === "COMPLETED").length
   const conversionRate = quotations.length ? (completedCount / quotations.length) * 100 : 0
-  const collectionRate = quotedTotal ? (paidTotal / quotedTotal) * 100 : 0
   const stockValue = products.reduce((sum, product) => sum + product.stock * Number(product.unitPrice), 0)
   const totalStock = products.reduce((sum, product) => sum + product.stock, 0)
   const stockIn = stockMovements.filter((movement) => movement.type === "STOCK_IN").reduce((sum, movement) => sum + movement.quantity, 0)
@@ -123,21 +121,21 @@ export default async function ReportsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Reports</h1>
-          <p className="text-sm text-muted-foreground mt-1">Revenue, conversion, collection, product, and employee performance.</p>
+          <p className="text-sm text-muted-foreground mt-1">Revenue, conversion, product, inventory, and employee performance.</p>
         </div>
         <ExportXlsxButton rows={customerRows} filename={`quotation-report-${new Date().toISOString()}`} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Quoted Revenue</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(quotedTotal)}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Collected</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(paidTotal)}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Revenue</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(paidTotal)}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Receipts Issued</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{receipts.length}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Receipted</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(receiptedTotal)}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Conversion</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{conversionRate.toFixed(1)}%</div><p className="text-xs text-muted-foreground mt-1">{collectionRate.toFixed(1)}% collected</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Conversion</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{conversionRate.toFixed(1)}%</div><p className="text-xs text-muted-foreground mt-1">Completed quotations</p></CardContent></Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Total Stock</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{totalStock}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Stock Value</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(stockValue, products[0]?.currency || "USD")}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Stock Value</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(stockValue, "ZMW")}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Stock In / Out</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{stockIn} / {stockOut}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Damaged / Lost</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{damaged} / {lost}</div></CardContent></Card>
       </div>
@@ -188,7 +186,7 @@ export default async function ReportsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Employee Performance</CardTitle>
-          <CardDescription>Assigned revenue and collections by employee.</CardDescription>
+          <CardDescription>Assigned revenue, payments, targets, and follow-up activity by employee.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
