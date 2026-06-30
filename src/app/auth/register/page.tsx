@@ -28,6 +28,7 @@ function RegisterForm() {
     lastName: "",
     email: "",
     phone: "",
+    nrc: "",
     companyName: "",
     companySlug: initialCompanySlug,
     password: "",
@@ -72,6 +73,7 @@ function RegisterForm() {
           lastName: formData.lastName,
           email: formData.email,
           phone: formData.phone,
+          nrc: formData.nrc,
           companySlug: formData.companySlug || undefined,
           password: formData.password,
           confirmPassword: formData.confirmPassword,
@@ -105,7 +107,7 @@ function RegisterForm() {
       }
 
       const signInResult = await signIn("credentials", {
-        email: parsed.data.email,
+        email: data.loginIdentifier || parsed.data.email || formData.phone || formData.nrc,
         password: formData.password,
         redirect: false,
       })
@@ -189,9 +191,13 @@ function RegisterForm() {
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field id="email" label="Email" type="email" value={formData.email} onChange={handleChange} error={validationErrors.email} />
+                <Field id="email" label={accountType === "CUSTOMER" ? "Email (optional)" : "Email"} type="email" value={formData.email} onChange={handleChange} error={validationErrors.email} required={accountType === "BUSINESS"} />
                 <Field id="phone" label="Phone" value={formData.phone} onChange={handleChange} error={validationErrors.phone} />
               </div>
+
+              {accountType === "CUSTOMER" && (
+                <Field id="nrc" label="NRC (optional)" value={formData.nrc} onChange={handleChange} error={validationErrors.nrc} required={false} />
+              )}
 
               {accountType === "BUSINESS" ? (
                 <Field id="companyName" label="Company Name" value={formData.companyName} onChange={handleChange} error={validationErrors.companyName} />
@@ -243,6 +249,7 @@ function Field({
   error,
   type = "text",
   placeholder,
+  required = true,
 }: {
   id: string
   label: string
@@ -251,11 +258,12 @@ function Field({
   error?: string
   type?: string
   placeholder?: string
+  required?: boolean
 }) {
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} name={id} type={type} value={value} placeholder={placeholder} onChange={onChange} className={error ? "border-destructive" : ""} required={id !== "companySlug"} />
+      <Input id={id} name={id} type={type} value={value} placeholder={placeholder} onChange={onChange} className={error ? "border-destructive" : ""} required={required && id !== "companySlug"} />
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )

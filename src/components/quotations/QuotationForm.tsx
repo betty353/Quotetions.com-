@@ -29,6 +29,7 @@ interface QuotationFormProps {
   products: ProductOption[]
   customers: CustomerOption[]
   customerRole: string
+  mode?: "quotation" | "purchase-order"
 }
 
 interface FormValues extends CreateQuotationInput {
@@ -36,7 +37,7 @@ interface FormValues extends CreateQuotationInput {
   items: Array<{ productId: string; quantity: number; discount: number }>
 }
 
-export default function QuotationForm({ products, customers, customerRole }: QuotationFormProps) {
+export default function QuotationForm({ products, customers, customerRole, mode = "quotation" }: QuotationFormProps) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -44,6 +45,7 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
   const isEmployee = customerRole === "EMPLOYEE"
   const canApplyDiscount = ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"].includes(customerRole)
   const canRequestDiscount = isEmployee
+  const isPurchaseOrder = mode === "purchase-order"
 
   const { register, control, handleSubmit, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(createQuotationSchema),
@@ -82,7 +84,7 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
       const payload: CreateQuotationInput = {
         customerId: values.customerId,
         items: values.items,
-        notes: values.notes,
+        notes: isPurchaseOrder ? `Purchase order request. ${values.notes || ""}`.trim() : values.notes,
         terms: values.terms,
         validUntil: validUntilValue ? new Date(validUntilValue).toISOString() : undefined,
       }
@@ -105,7 +107,7 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
         return
       }
 
-      router.push("/dashboard/quotations")
+      router.push(isPurchaseOrder ? "/dashboard/orders" : "/dashboard/quotations")
     } catch (err: any) {
       setError(err.message || "Unexpected error")
     }
@@ -140,7 +142,7 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
         <div className="flex items-center justify-between">
           <div>
             <Label>Quotation Items</Label>
-            <p className="text-xs text-muted-foreground">{isCustomer ? "Add products and quantities for your quotation request." : canApplyDiscount ? "Add products, quantities, and approved discounts." : "Add products and request admin approval for any discount."}</p>
+            <p className="text-xs text-muted-foreground">{isPurchaseOrder ? "Add products and quantities for the customer purchase order." : isCustomer ? "Add products and quantities for your quotation request." : canApplyDiscount ? "Add products, quantities, and approved discounts." : "Add products and request admin approval for any discount."}</p>
           </div>
           <Button type="button" variant="secondary" onClick={() => append({ productId: products[0]?.id || "", quantity: 1, discount: 0 })}>
             Add Item
@@ -209,7 +211,7 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
       </div>
 
       <div>
-        <Label htmlFor="notes">Customer Notes</Label>
+        <Label htmlFor="notes">{isPurchaseOrder ? "Purchase Order Notes" : "Customer Notes"}</Label>
         <Textarea id="notes" {...register("notes")} rows={4} />
       </div>
 
@@ -228,7 +230,7 @@ export default function QuotationForm({ products, customers, customerRole }: Quo
       )}
 
       <div className="flex items-center gap-2">
-        <Button type="submit">Create Quotation</Button>
+        <Button type="submit">{isPurchaseOrder ? "Create Purchase Order" : "Create Quotation"}</Button>
         <Button variant="ghost" type="button" onClick={() => router.back()}>
           Cancel
         </Button>

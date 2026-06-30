@@ -6,13 +6,14 @@ import QuotationForm from "@/components/quotations/QuotationForm"
 import { isCompanyAdminRole } from "@/lib/tenant"
 
 type NewQuotationPageProps = {
-  searchParams?: Promise<{ companySlug?: string }>
+  searchParams?: Promise<{ companySlug?: string; mode?: string }>
 }
 
 export default async function NewQuotationPage({ searchParams }: NewQuotationPageProps) {
   const session = await getServerSession(authOptions)
   if (!session) redirect("/dashboard")
   const resolvedSearchParams = searchParams ? await searchParams : {}
+  const formMode = resolvedSearchParams.mode === "purchase-order" ? "purchase-order" : "quotation"
 
   const role = (session.user as any).role
   const sessionCompanyId = (session.user as any).companyId as string | null
@@ -72,8 +73,8 @@ export default async function NewQuotationPage({ searchParams }: NewQuotationPag
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">{role === "CUSTOMER" ? "Request Quotation" : "New Quotation"}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{role === "CUSTOMER" ? "Select products or services and submit your quotation request." : "Create a new customer quotation with configurable line items."}</p>
+        <h1 className="text-2xl font-bold">{formMode === "purchase-order" ? "New Purchase Order" : role === "CUSTOMER" ? "Request Quotation" : "New Quotation"}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{formMode === "purchase-order" ? "Create an order for a customer using active catalog items." : role === "CUSTOMER" ? "Select products or services and submit your quotation request." : "Create a new customer quotation with configurable line items."}</p>
       </div>
 
       {products.length === 0 ? (
@@ -94,6 +95,7 @@ export default async function NewQuotationPage({ searchParams }: NewQuotationPag
             email: "user" in customer ? customer.user.email : customer.email,
           }))}
           customerRole={role}
+          mode={formMode}
         />
       )}
     </div>

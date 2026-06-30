@@ -2,7 +2,7 @@ import { z } from "zod"
 
 // Auth Schemas
 export const loginSchema = z.object({
-  email: z.string().email("Invalid email address").transform((email) => email.trim().toLowerCase()),
+  email: z.string().trim().min(1, "Email, phone, or NRC is required").transform((value) => value.toLowerCase()),
   password: z.string().min(6, "Password must be at least 6 characters"),
 })
 
@@ -27,9 +27,15 @@ export const businessRegistrationSchema = baseRegistrationSchema.extend({
 
 export const customerRegistrationSchema = baseRegistrationSchema.extend({
   accountType: z.literal("CUSTOMER").default("CUSTOMER"),
+  email: z.preprocess((value) => value === "" ? undefined : value, z.string().email("Invalid email address").transform((email) => email.trim().toLowerCase()).optional()),
+  nrc: z.string().trim().optional(),
   companySlug: z.string().trim().optional(),
   companyId: z.string().trim().optional(),
 }).refine((data) => data.password === data.confirmPassword, confirmPasswordsMatch)
+  .refine((data) => Boolean(data.email || data.phone || data.nrc), {
+    message: "Use an email, phone number, or NRC to register",
+    path: ["phone"],
+  })
 
 export const registerSchema = z.union([
   businessRegistrationSchema,
@@ -140,6 +146,7 @@ export const updateCustomerProfileSchema = z.object({
   id: z.string().trim().optional(),
   firstName: z.string().trim().min(2, "First name is required").optional(),
   lastName: z.string().trim().min(2, "Last name is required").optional(),
+  email: z.preprocess((value) => value === "" ? undefined : value, z.string().email("Valid email is required").transform((email) => email.trim().toLowerCase()).optional()),
   phone: z.string().trim().min(6, "Phone is required").optional(),
   nrc: z.string().trim().optional(),
   passportPhotoUrl: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),

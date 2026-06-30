@@ -32,7 +32,6 @@ import {
   Settings,
   ShoppingCart,
   Sun,
-  Truck,
   UserCog,
   Users,
   WalletCards,
@@ -49,13 +48,12 @@ const sidebarItems = [
   { icon: Package, iconColor: "text-violet-600", label: "Products & Services", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: FileText, iconColor: "text-sky-600", label: "Quotations", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: Percent, iconColor: "text-orange-600", label: "Discount Requests", href: "/dashboard/discount-requests", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
-  { icon: ShoppingCart, iconColor: "text-orange-600", label: "Orders", href: "/dashboard/quotations", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
+  { icon: ShoppingCart, iconColor: "text-orange-600", label: "Orders", href: "/dashboard/orders", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: WalletCards, iconColor: "text-indigo-600", label: "Invoices", href: "/dashboard/invoices", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: Receipt, iconColor: "text-rose-600", label: "Receipts", href: "/dashboard/receipts", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: CreditCard, iconColor: "text-cyan-600", label: "Payments", href: "/dashboard/payments", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE", "CUSTOMER"] },
   { icon: BarChart3, iconColor: "text-lime-600", label: "Reports", href: "/dashboard/reports", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
   { icon: PackageSearch, iconColor: "text-fuchsia-600", label: "Inventory", href: "/dashboard/inventory", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
-  { icon: Truck, iconColor: "text-amber-600", label: "Products", href: "/dashboard/products", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: Building2, iconColor: "text-stone-700", label: "Company Profile", href: "/dashboard/settings", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: UserCog, iconColor: "text-purple-600", label: "Users", href: "/dashboard/employees", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
   { icon: Landmark, iconColor: "text-teal-600", label: "Payment Setup", href: "/dashboard/payment-setup", allowedRoles: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] },
@@ -123,13 +121,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <div className="flex h-16 items-center gap-3 border-b border-border px-4">
           <Image src="/logo.jpg" alt="Astro City Limited logo" width={112} height={56} className="h-9 w-16 rounded-xl object-contain" priority />
           {!collapsed && (
-            <button className="flex min-w-0 flex-1 items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent">
+            <Link href="/dashboard/settings" className="flex min-w-0 flex-1 items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent">
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold">Astro city crm</span>
                 <span className="block truncate text-xs text-muted-foreground">Main workspace</span>
               </span>
               <ChevronDown size={16} className="text-muted-foreground" />
-            </button>
+            </Link>
           )}
           <button
             type="button"
@@ -216,15 +214,16 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <p className="truncate text-xs text-muted-foreground">Enterprise quotation workspace</p>
             </div>
 
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 shadow-[0_1px_1px_rgba(15,23,42,0.02)]">
+            <form action="/dashboard/customers" className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 shadow-[0_1px_1px_rgba(15,23,42,0.02)]">
               <Search size={18} className="text-muted-foreground" />
               <input
                 type="text"
+                name="q"
                 placeholder="Search customers, quotations, payments..."
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               />
-              <kbd className="hidden rounded-md border border-border bg-surface px-1.5 py-0.5 text-[11px] text-muted-foreground sm:inline-flex">⌘K</kbd>
-            </div>
+              <kbd className="hidden rounded-md border border-border bg-surface px-1.5 py-0.5 text-[11px] text-muted-foreground sm:inline-flex">Ctrl K</kbd>
+            </form>
 
             <div className="flex items-center gap-2">
               <Link
@@ -234,9 +233,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <Plus size={18} className="text-white" />
                 <span>New</span>
               </Link>
-              <button type="button" aria-label="Help" className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+              <Link href="/dashboard/support" aria-label="Help" className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
                 <CircleHelp size={20} className="text-blue-600" />
-              </button>
+              </Link>
               <button
                 type="button"
                 aria-label="Toggle theme"
@@ -246,11 +245,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 {resolvedTheme === "dark" ? <Sun size={20} className="text-amber-500" /> : <Moon size={20} className="text-indigo-600" />}
               </button>
               <NotificationBell />
-              <button className="hidden items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent sm:flex">
+              <Link href="/dashboard/settings" className="hidden items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent sm:flex">
                 <Building2 size={18} className="text-emerald-600" />
                 <span className="max-w-24 truncate">Company</span>
                 <ChevronDown size={16} className="text-muted-foreground" />
-              </button>
+              </Link>
             </div>
           </div>
         </header>

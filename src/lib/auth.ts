@@ -17,7 +17,7 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email", placeholder: "email@example.com" },
+        email: { label: "Email, phone, or NRC", type: "text", placeholder: "email@example.com, phone, or NRC" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
@@ -26,15 +26,23 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid email or password")
         }
 
-        const { email, password } = parsed.data
-        const limit = rateLimit(`login:${email}`, 8, 60_000)
+        const { email: identifier, password } = parsed.data
+        const limit = rateLimit(`login:${identifier}`, 8, 60_000)
         if (!limit.ok) {
-          await auditAuthEvent({ action: "LOGIN_FAILED", email, metadata: { reason: "rate_limited" } })
+          await auditAuthEvent({ action: "LOGIN_FAILED", email: identifier, metadata: { reason: "rate_limited" } })
           throw new Error("Too many attempts. Please try again shortly.")
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email },
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { email: identifier },
+              { phone: identifier },
+              { customer: { is: { nrc: identifier } } },
+              { customer: { is: { phone: identifier } } },
+              { customer: { is: { whatsappNumber: identifier } } },
+            ],
+          },
           select: {
             id: true,
             email: true,
@@ -48,26 +56,26 @@ export const authOptions: NextAuthOptions = {
         })
 
         if (!user) {
-          await auditAuthEvent({ action: "LOGIN_FAILED", email, metadata: { reason: "invalid_credentials" } })
-          throw new Error("Invalid email or password")
+          await auditAuthEvent({ action: "LOGIN_FAILED", email: identifier, metadata: { reason: "invalid_credentials" } })
+          throw new Error("Invalid login details or password")
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password)
         if (!isPasswordValid) {
-          await auditAuthEvent({ action: "LOGIN_FAILED", userId: user.id, companyId: user.companyId, email, metadata: { reason: "invalid_credentials" } })
-          throw new Error("Invalid email or password")
+          await auditAuthEvent({ action: "LOGIN_FAILED", userId: user.id, companyId: user.companyId, email: user.email, metadata: { reason: "invalid_credentials", identifier } })
+          throw new Error("Invalid login details or password")
         }
 
         if (!user.isActive) {
-          await auditAuthEvent({ action: "LOGIN_FAILED", userId: user.id, companyId: user.companyId, email, metadata: { reason: "inactive_user" } })
-          throw new Error("Invalid email or password")
+          await auditAuthEvent({ action: "LOGIN_FAILED", userId: user.id, companyId: user.companyId, email: user.email, metadata: { reason: "inactive_user", identifier } })
+          throw new Error("Invalid login details or password")
         }
 
         await prisma.user.update({
           where: { id: user.id },
           data: { lastLogin: new Date() },
         })
-        await auditAuthEvent({ action: "LOGIN", userId: user.id, companyId: user.companyId, email })
+        await auditAuthEvent({ action: "LOGIN", userId: user.id, companyId: user.companyId, email: user.email })
 
         return {
           id: user.id,

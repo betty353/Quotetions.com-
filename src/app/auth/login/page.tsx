@@ -15,7 +15,7 @@ import { AlertCircle, Loader2 } from "lucide-react"
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [email, setEmail] = useState("")
+  const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -27,7 +27,7 @@ function LoginForm() {
 
     try {
       const result = await signIn("credentials", {
-        email,
+        email: identifier,
         password,
         redirect: false,
       })
@@ -51,8 +51,8 @@ function LoginForm() {
         {/* Logo/Brand */}
         <div className="text-center mb-8">
           <Image src="/logo.jpg" alt="Astro City Limited logo" width={180} height={96} className="mx-auto mb-4 h-20 w-40 rounded-lg object-contain" priority />
-          <h1 className="text-3xl font-bold text-gray-900">Astro city crm</h1>
-          <p className="text-gray-600 mt-2">Enterprise Quotation Management</p>
+          <h1 className="text-3xl font-bold text-foreground">Astro city crm</h1>
+          <p className="text-muted-foreground mt-2">Enterprise Quotation Management</p>
         </div>
 
         <Card>
@@ -70,13 +70,13 @@ function LoginForm() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email, Phone, or NRC</Label>
                 <Input
                   id="email"
-                  type="email"
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text"
+                  placeholder="you@company.com, phone number, or NRC"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   disabled={isLoading}
                   required
                 />
@@ -106,7 +106,7 @@ function LoginForm() {
             </form>
 
             <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 Don&apos;t have an account?{" "}
                 <Link href="/auth/register" className="font-medium text-foreground underline-offset-4 hover:underline">
                   Create one

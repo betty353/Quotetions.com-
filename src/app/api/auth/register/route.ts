@@ -6,12 +6,18 @@ import { registerSchema } from "@/lib/schemas"
 import { auditAuthEvent } from "@/lib/audit"
 import { getClientIp, rateLimit } from "@/lib/rate-limit"
 import { createUniqueCompanySlug } from "@/lib/tenant"
+import { slugify } from "@/lib/utils"
 
 function isSameOrigin(request: NextRequest) {
   const origin = request.headers.get("origin")
   if (!origin) return true
   const host = request.headers.get("host")
   return host ? new URL(origin).host === host : false
+}
+
+function customerFallbackEmail(companySlug: string | null | undefined, phone: string, nrc?: string | null) {
+  const identifier = slugify(nrc || phone || "customer").replace(/^-+|-+$/g, "") || "customer"
+  return `customer-${companySlug || "public"}-${identifier}@customers.astrocity.local`
 }
 
 export async function POST(request: NextRequest) {
@@ -22,7 +28,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const validatedData = registerSchema.parse(body)
-    const email = validatedData.email
+    const email = validatedData.accountType === "CUSTOMER" && !validatedData.email
+      ? customerFallbackEmail(validatedData.companySlug, validatedData.phone, validatedData.nrc)
+      : validatedData.email
     const ip = getClientIp(request)
     const limit = rateLimit(`register:${ip}:${email}`, 5, 10 * 60_000)
 
@@ -44,20 +52,21 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(validatedData.password, 12)
 
     if (validatedData.accountType === "BUSINESS") {
+      const businessEmail = validatedData.email
       const slug = await createUniqueCompanySlug(validatedData.companyName)
       const result = await prisma.$transaction(async (tx) => {
         const company = await tx.company.create({
           data: {
             name: validatedData.companyName,
             slug,
-            email,
+            email: businessEmail,
             phone: validatedData.phone,
           },
         })
 
         const user = await tx.user.create({
           data: {
-            email,
+            email: businessEmail,
             firstName: validatedData.firstName,
             lastName: validatedData.lastName,
             phone: validatedData.phone,
@@ -86,7 +95,7 @@ export async function POST(request: NextRequest) {
           data: {
             companyId: company.id,
             companyName: company.name,
-            companyEmail: email,
+            companyEmail: businessEmail,
             companyPhone: validatedData.phone,
             defaultCurrency: "ZMW",
             taxRate: 0,
@@ -131,9 +140,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Company store not found. Please use the latest store link from the company." }, { status: 400 })
     }
 
+    const customerEmail = validatedData.email || customerFallbackEmail(company?.slug, validatedData.phone, validatedData.nrc)
+    if (!validatedData.email) {
+      const existingGeneratedUser = await prisma.user.findUnique({ where: { email: customerEmail }, select: { id: true } })
+      if (existingGeneratedUser) {
+        await auditAuthEvent({ action: "REGISTER", email: customerEmail, request, metadata: { blocked: true, reason: "customer_login_exists" } })
+        return NextResponse.json({ error: "This customer already has an account for this company. Please sign in with phone or NRC." }, { status: 400 })
+      }
+    }
+
+    const existingCustomer = await prisma.customer.findFirst({
+      where: {
+        companyId: company?.id ?? null,
+        OR: [
+          { phone: validatedData.phone },
+          ...(validatedData.nrc ? [{ nrc: validatedData.nrc }] : []),
+          ...(validatedData.email ? [{ user: { is: { email: validatedData.email } } }] : []),
+        ],
+      },
+      select: { id: true },
+    })
+
+    if (existingCustomer) {
+      await auditAuthEvent({ action: "REGISTER", email: customerEmail, request, metadata: { blocked: true, reason: "customer_exists" } })
+      return NextResponse.json({ error: "This customer already has an account for this company. Please sign in with email, phone, or NRC." }, { status: 400 })
+    }
+
     const user = await prisma.user.create({
       data: {
-        email,
+        email: customerEmail,
         firstName: validatedData.firstName,
         lastName: validatedData.lastName,
         phone: validatedData.phone,
@@ -146,6 +181,7 @@ export async function POST(request: NextRequest) {
             companyId: company?.id ?? null,
             phone: validatedData.phone,
             contactPerson: `${validatedData.firstName} ${validatedData.lastName}`,
+            nrc: validatedData.nrc || null,
             status: "ACTIVE",
           },
         },
@@ -164,15 +200,16 @@ export async function POST(request: NextRequest) {
       action: "REGISTER",
       userId: user.id,
       companyId: user.companyId,
-      email,
+      email: user.email,
       request,
-      metadata: { accountType: "CUSTOMER", role: "CUSTOMER" },
+      metadata: { accountType: "CUSTOMER", role: "CUSTOMER", loginWith: validatedData.email ? "email" : validatedData.nrc ? "nrc" : "phone" },
     })
 
     return NextResponse.json(
       {
         message: "Customer account created successfully",
         redirectTo: company ? `/dashboard/quotations/new?companySlug=${company.slug}` : "/dashboard",
+        loginIdentifier: customerEmail,
       },
       { status: 201 }
     )

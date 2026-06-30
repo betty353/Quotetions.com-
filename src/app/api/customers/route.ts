@@ -100,6 +100,13 @@ export async function PATCH(request: NextRequest) {
 
     if (!customer) return NextResponse.json({ error: "Customer not found" }, { status: 404 })
 
+    if (parsed.email && parsed.email !== customer.user.email) {
+      const existingEmail = await prisma.user.findUnique({ where: { email: parsed.email }, select: { id: true } })
+      if (existingEmail && existingEmail.id !== customer.userId) {
+        return NextResponse.json({ error: "This email is already used by another account." }, { status: 400 })
+      }
+    }
+
     const [updatedCustomer] = await prisma.$transaction([
       prisma.customer.update({
         where: { id: customer.id },
@@ -120,6 +127,7 @@ export async function PATCH(request: NextRequest) {
       prisma.user.update({
         where: { id: customer.userId },
         data: {
+          email: parsed.email || customer.user.email,
           firstName: parsed.firstName || customer.user.firstName,
           lastName: parsed.lastName || customer.user.lastName,
           phone: parsed.phone || customer.user.phone,

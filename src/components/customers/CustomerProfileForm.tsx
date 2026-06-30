@@ -21,6 +21,7 @@ type CustomerProfileFormProps = {
     country?: string | null
     phone?: string | null
     user: {
+      email: string
       firstName: string
       lastName: string
       phone?: string | null
@@ -53,6 +54,7 @@ export default function CustomerProfileForm({ customer, editableByStaff = false 
     id: editableByStaff ? customer.id : undefined,
     firstName: customer.user.firstName || "",
     lastName: customer.user.lastName || "",
+    email: customer.user.email || "",
     phone: customer.phone || customer.user.phone || "",
     nrc: customer.nrc || "",
     passportPhotoUrl: customer.passportPhotoUrl || "",
@@ -120,6 +122,7 @@ export default function CustomerProfileForm({ customer, editableByStaff = false 
       <div className="grid gap-3 sm:grid-cols-2">
         <div><Label>First Name</Label><Input name="firstName" value={form.firstName} onChange={handleChange} /></div>
         <div><Label>Last Name</Label><Input name="lastName" value={form.lastName} onChange={handleChange} /></div>
+        <div><Label>Email</Label><Input name="email" type="email" value={form.email} onChange={handleChange} /></div>
         <div><Label>Phone</Label><Input name="phone" value={form.phone} onChange={handleChange} /></div>
         <div><Label>WhatsApp</Label><Input name="whatsappNumber" value={form.whatsappNumber} onChange={handleChange} /></div>
         <div><Label>NRC</Label><Input name="nrc" value={form.nrc} onChange={handleChange} /></div>

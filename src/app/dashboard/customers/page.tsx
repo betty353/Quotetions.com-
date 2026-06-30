@@ -6,11 +6,15 @@ import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency } from "@/lib/utils"
-import { ArrowRight, Users } from "lucide-react"
+import { ArrowRight, Search, Users } from "lucide-react"
 import { isCompanyAdminRole } from "@/lib/tenant"
 import CreateCustomerForm from "@/components/customers/CreateCustomerForm"
 
-export default async function CustomersPage() {
+type CustomersPageProps = {
+  searchParams?: Promise<{ q?: string }>
+}
+
+export default async function CustomersPage({ searchParams }: CustomersPageProps) {
   const session = await getServerSession(authOptions)
   if (!session) redirect("/dashboard")
 
@@ -18,9 +22,30 @@ export default async function CustomersPage() {
   if (!isCompanyAdminRole(role) && role !== "EMPLOYEE") redirect("/dashboard")
   const companyId = (session.user as any).companyId as string | null
   if (!companyId) redirect("/dashboard")
+  const resolvedSearchParams = searchParams ? await searchParams : {}
+  const query = (resolvedSearchParams.q || "").trim()
+  const searchWhere = query
+    ? {
+        OR: [
+          { companyName: { contains: query, mode: "insensitive" as const } },
+          { contactPerson: { contains: query, mode: "insensitive" as const } },
+          { phone: { contains: query, mode: "insensitive" as const } },
+          { nrc: { contains: query, mode: "insensitive" as const } },
+          { whatsappNumber: { contains: query, mode: "insensitive" as const } },
+          { town: { contains: query, mode: "insensitive" as const } },
+          { region: { contains: query, mode: "insensitive" as const } },
+          { user: { is: { OR: [
+            { firstName: { contains: query, mode: "insensitive" as const } },
+            { lastName: { contains: query, mode: "insensitive" as const } },
+            { email: { contains: query, mode: "insensitive" as const } },
+            { phone: { contains: query, mode: "insensitive" as const } },
+          ] } } },
+        ],
+      }
+    : {}
 
   const customers = await prisma.customer.findMany({
-    where: { companyId, status: { not: "REMOVED" } },
+    where: { companyId, status: { not: "REMOVED" }, ...searchWhere },
     orderBy: { updatedAt: "desc" },
     include: {
       user: true,
@@ -96,7 +121,18 @@ export default async function CustomersPage() {
           <CardTitle>Customer Ledger</CardTitle>
           <CardDescription>Clean customer list with financial position. Open a customer to view contact details, follow-ups, and activity.</CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="space-y-4 overflow-x-auto">
+          <form action="/dashboard/customers" className="flex max-w-xl items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <input
+              name="q"
+              defaultValue={query}
+              placeholder="Search by name, phone, NRC, email, town..."
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+            <button className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground" type="submit">Search</button>
+            {query && <Link href="/dashboard/customers" className="text-xs text-muted-foreground underline-offset-4 hover:underline">Clear</Link>}
+          </form>
           {rows.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Users className="mx-auto mb-4 h-12 w-12 opacity-50" />

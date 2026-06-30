@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import DownloadQuotationPdf from "@/components/quotations/DownloadQuotationPdf"
 import { isCompanyAdminRole } from "@/lib/tenant"
+import GenerateInvoiceButton from "@/components/invoices/GenerateInvoiceButton"
 
 export default async function InvoicesPage() {
   const session = await getServerSession(authOptions)
@@ -60,7 +61,7 @@ export default async function InvoicesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Invoice Register</CardTitle>
-          <CardDescription>Open any invoice to take payment, generate receipts, or download documents.</CardDescription>
+          <CardDescription>Generate invoices from quotations, take payment, generate receipts, or download documents.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {rows.length === 0 ? (
@@ -94,7 +95,12 @@ export default async function InvoicesPage() {
                     <td className="px-4 py-3">{formatCurrency(outstanding, invoice.currency)}</td>
                     <td className="px-4 py-3">{invoice.receipts.length}</td>
                     <td className="px-4 py-3">{formatDate(invoice.createdAt)}</td>
-                    <td className="px-4 py-3"><DownloadQuotationPdf quotationId={invoice.id} /></td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <GenerateInvoiceButton quotationId={invoice.id} disabled={invoice.status === "REJECTED" || invoice.status === "EXPIRED"} />
+                        <DownloadQuotationPdf quotationId={invoice.id} />
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
