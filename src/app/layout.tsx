@@ -8,12 +8,18 @@ export const metadata: Metadata = {
   keywords: "quotation, sales, CRM, receipt, invoice, business management",
   authors: [{ name: "Astro city crm" }],
   creator: "Astro city crm",
+  icons: {
+    icon: "/logo.jpg",
+    shortcut: "/logo.jpg",
+    apple: "/logo.jpg",
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://quotetion.vercel.app",
     title: "Astro city crm",
     description: "Enterprise Quotation Management Platform",
+    images: ["/logo.jpg"],
   },
 }
 

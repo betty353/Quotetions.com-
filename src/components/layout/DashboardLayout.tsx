@@ -96,7 +96,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <div className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-card/95 backdrop-blur lg:hidden">
         <div className="flex h-16 items-center justify-between px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <Image src="/logo.jpg" alt="Astro city crm logo" width={32} height={32} className="h-8 w-8 rounded-lg object-contain" />
+            <Image src="/logo.jpg" alt="Astro City Limited logo" width={96} height={48} className="h-8 w-16 rounded-lg object-contain" priority />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">Astro city crm</p>
               <p className="truncate text-xs text-muted-foreground">CRM Workspace</p>
@@ -121,7 +121,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="flex h-16 items-center gap-3 border-b border-border px-4">
-          <Image src="/logo.jpg" alt="Astro city crm logo" width={36} height={36} className="h-9 w-9 rounded-xl object-contain" />
+          <Image src="/logo.jpg" alt="Astro City Limited logo" width={112} height={56} className="h-9 w-16 rounded-xl object-contain" priority />
           {!collapsed && (
             <button className="flex min-w-0 flex-1 items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent">
               <span className="min-w-0">

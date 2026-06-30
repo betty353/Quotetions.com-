@@ -127,7 +127,7 @@ function RegisterForm() {
     <div className="min-h-screen bg-background px-4 py-10">
       <div className="mx-auto w-full max-w-5xl">
         <div className="mb-8 text-center">
-          <Image src="/logo.jpg" alt="Astro city crm logo" width={64} height={64} className="mx-auto mb-4 h-16 w-16 rounded-xl object-contain" />
+          <Image src="/logo.jpg" alt="Astro City Limited logo" width={180} height={96} className="mx-auto mb-4 h-20 w-40 rounded-xl object-contain" priority />
           <h1 className="text-3xl font-semibold tracking-tight">{isStoreCustomerFlow ? "Create customer account" : "Create your account"}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {isStoreCustomerFlow

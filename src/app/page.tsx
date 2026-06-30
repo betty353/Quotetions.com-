@@ -21,7 +21,7 @@ export default async function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <Image src="/logo.jpg" alt="Astro city crm logo" width={40} height={40} className="h-10 w-10 rounded-lg object-contain" />
+              <Image src="/logo.jpg" alt="Astro City Limited logo" width={120} height={60} className="h-10 w-24 rounded-lg object-contain" priority />
               <span className="text-xl font-bold text-foreground">Astro city crm</span>
             </div>
             <div className="flex items-center gap-4">

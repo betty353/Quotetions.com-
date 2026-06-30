@@ -50,7 +50,7 @@ function LoginForm() {
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <Image src="/logo.jpg" alt="Astro city crm logo" width={64} height={64} className="mx-auto mb-4 h-16 w-16 rounded-lg object-contain" />
+          <Image src="/logo.jpg" alt="Astro City Limited logo" width={180} height={96} className="mx-auto mb-4 h-20 w-40 rounded-lg object-contain" priority />
           <h1 className="text-3xl font-bold text-gray-900">Astro city crm</h1>
           <p className="text-gray-600 mt-2">Enterprise Quotation Management</p>
         </div>
