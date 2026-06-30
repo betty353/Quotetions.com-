@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
+import Link from "next/link"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,6 +10,29 @@ import { Button } from "@/components/ui/button"
 import { formatDateTime } from "@/lib/utils"
 import { BellRing } from "lucide-react"
 import { isCompanyAdminRole } from "@/lib/tenant"
+
+function notificationHref(notification: {
+  relatedId?: string | null
+  relatedModel?: string | null
+  customerId?: string | null
+  quotationId?: string | null
+  paymentId?: string | null
+  receiptId?: string | null
+  followUpId?: string | null
+}) {
+  if (notification.relatedModel === "InternalChatRoom" && notification.relatedId) return `/dashboard/chat?roomId=${notification.relatedId}`
+  if (notification.relatedModel === "InternalChatMessage") return "/dashboard/chat"
+  if (notification.relatedModel === "DiscountRequest") return "/dashboard/discount-requests"
+  if (notification.relatedModel === "Quotation" || notification.quotationId) {
+    const quotationId = notification.quotationId || notification.relatedId
+    return quotationId ? `/dashboard/quotations/${quotationId}` : "/dashboard/quotations"
+  }
+  if (notification.relatedModel === "FollowUp") return notification.quotationId ? `/dashboard/quotations/${notification.quotationId}` : "/dashboard/followups"
+  if (notification.relatedModel === "Receipt" || notification.receiptId) return "/dashboard/receipts"
+  if (notification.relatedModel === "Payment" || notification.paymentId) return "/dashboard/payments"
+  if ((notification.relatedModel === "Customer" || notification.customerId) && notification.customerId) return `/dashboard/customers/${notification.customerId}`
+  return "/dashboard/notifications"
+}
 
 async function markNotificationRead(formData: FormData) {
   "use server"
@@ -105,9 +129,9 @@ export default async function NotificationsPage() {
           ) : (
             <div className="space-y-3">
               {notifications.map((notification) => (
-                <div key={notification.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                <div key={notification.id} className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
+                    <Link href={notificationHref(notification)} className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="font-semibold">{notification.title}</h2>
                         <Badge variant={notification.isRead ? "outline" : "info"}>{notification.isRead ? "Read" : "Unread"}</Badge>
@@ -121,7 +145,8 @@ export default async function NotificationsPage() {
                         {notification.payment && <span>Payment: {notification.payment.paymentNumber}</span>}
                         {notification.receipt && <span>Receipt: {notification.receipt.receiptNumber}</span>}
                       </div>
-                    </div>
+                      <p className="mt-2 text-xs font-medium text-blue-600">Open related item</p>
+                    </Link>
                     {!notification.isRead && (
                       <form action={markNotificationRead}>
                         <input type="hidden" name="id" value={notification.id} />

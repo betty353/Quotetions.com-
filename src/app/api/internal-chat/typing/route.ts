@@ -6,10 +6,15 @@ import { isCompanyAdminRole } from "@/lib/tenant"
 
 const typingSchema = z.object({
   recipientId: z.string().optional().nullable(),
+  roomId: z.string().optional().nullable(),
 })
 
 function channelFor(recipientId?: string | null) {
   return recipientId ? `direct:${recipientId}` : "team"
+}
+
+function roomChannel(roomId?: string | null) {
+  return roomId ? `room:${roomId}` : "team"
 }
 
 export async function POST(request: NextRequest) {
@@ -27,11 +32,12 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Validation failed" }, { status: 400 })
 
   const recipientId = parsed.data.recipientId || null
+  const roomId = parsed.data.roomId || null
   if (role === "CUSTOMER" && !recipientId) {
     return NextResponse.json({ error: "Choose a staff member to message" }, { status: 400 })
   }
 
-  const channel = recipientId ? channelFor(recipientId) : "team"
+  const channel = recipientId ? channelFor(recipientId) : roomChannel(roomId)
   const expiresAt = new Date(Date.now() + 6000)
 
   await prisma.internalChatTyping.upsert({

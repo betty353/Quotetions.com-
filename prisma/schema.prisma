@@ -93,6 +93,7 @@ model User {
   firstName             String
   lastName              String
   phone                 String?
+  profileImageUrl       String?
   role                  UserRole  @default(CUSTOMER)
   isActive              Boolean   @default(true)
   isEmailVerified       Boolean   @default(false)
@@ -119,6 +120,7 @@ model User {
   productViews          ProductView[]
   sentInternalMessages  InternalChatMessage[] @relation("InternalChatMessageSender")
   receivedInternalMessages InternalChatMessage[] @relation("InternalChatMessageRecipient")
+  internalChatRoomMembers InternalChatRoomMember[]
   passwordResetTokens   PasswordResetToken[]
 
   @@index([email])
@@ -158,6 +160,8 @@ model Company {
   productStockMovements ProductStockMovement[]
   productViews          ProductView[]
   internalChatMessages  InternalChatMessage[]
+  internalChatRooms     InternalChatRoom[]
+  internalChatRoomMembers InternalChatRoomMember[]
   quotations            Quotation[]
   payments              Payment[]
   receipts              Receipt[]
@@ -344,6 +348,7 @@ model ProductView {
 model InternalChatMessage {
   id                    String    @id @default(cuid())
   companyId             String?
+  roomId                String?
   senderId              String
   recipientId           String?
   message               String    @db.Text
@@ -364,15 +369,53 @@ model InternalChatMessage {
   updatedAt             DateTime  @updatedAt
 
   company               Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  room                  InternalChatRoom? @relation(fields: [roomId], references: [id], onDelete: Cascade)
   sender                User      @relation("InternalChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   recipient             User?     @relation("InternalChatMessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
+  @@index([roomId])
   @@index([senderId])
   @@index([recipientId])
   @@index([replyToId])
   @@index([isPinned])
   @@index([createdAt])
+}
+
+model InternalChatRoom {
+  id                    String    @id @default(cuid())
+  companyId             String
+  name                  String
+  description           String?
+  createdById           String
+  isDefault             Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  company               Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  members               InternalChatRoomMember[]
+  messages              InternalChatMessage[]
+
+  @@index([companyId])
+  @@index([createdById])
+}
+
+model InternalChatRoomMember {
+  id                    String    @id @default(cuid())
+  companyId             String
+  roomId                String
+  userId                String
+  addedById             String?
+  createdAt             DateTime  @default(now())
+
+  company               Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  room                  InternalChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([companyId])
+  @@index([roomId])
+  @@index([userId])
 }
 
 model InternalChatPresence {

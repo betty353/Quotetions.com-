@@ -23,6 +23,7 @@ type NotificationItem = {
 }
 
 function notificationHref(notification: NotificationItem) {
+  if (notification.relatedModel === "InternalChatRoom" && notification.relatedId) return `/dashboard/chat?roomId=${notification.relatedId}`
   if (notification.relatedModel === "InternalChatMessage") return "/dashboard/chat"
   if (notification.relatedModel === "DiscountRequest") return "/dashboard/discount-requests"
   if (notification.relatedModel === "Quotation" || notification.quotationId) {

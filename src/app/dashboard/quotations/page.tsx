@@ -5,18 +5,36 @@ import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { FileText, PlusCircle } from "lucide-react"
+import { FileText, PlusCircle, Search } from "lucide-react"
 import { isCompanyAdminRole } from "@/lib/tenant"
 
-export default async function QuotationsPage() {
+type QuotationsPageProps = {
+  searchParams?: Promise<{ q?: string }>
+}
+
+function dateRangeFromQuery(query: string) {
+  const parsed = new Date(query)
+  if (Number.isNaN(parsed.getTime())) return null
+  const start = new Date(parsed)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 1)
+  return { gte: start, lt: end }
+}
+
+export default async function QuotationsPage({ searchParams }: QuotationsPageProps) {
   const session = await getServerSession(authOptions)
   if (!session) return null
+  const resolvedSearchParams = searchParams ? await searchParams : {}
+  const query = (resolvedSearchParams.q || "").trim()
+  const dateRange = query ? dateRangeFromQuery(query) : null
+  const statusQuery = ["DRAFT", "SENT", "VIEWED", "APPROVED", "REJECTED", "EXPIRED", "COMPLETED"].includes(query.toUpperCase()) ? query.toUpperCase() : null
   const role = (session.user as any).role
   const companyId = (session.user as any).companyId as string | null
   const customer = role === "CUSTOMER"
     ? await prisma.customer.findUnique({ where: { userId: session.user.id } })
     : null
-  const where: any = role === "CUSTOMER"
+  const baseWhere: any = role === "CUSTOMER"
     ? customer ? {
         customerId: customer.id,
         OR: [
@@ -27,6 +45,29 @@ export default async function QuotationsPage() {
         ],
       } : { id: "__none__" }
     : companyId ? { companyId } : {}
+  const searchWhere = query
+    ? {
+        OR: [
+          { quotationNumber: { contains: query, mode: "insensitive" as const } },
+          ...(statusQuery ? [{ status: { equals: statusQuery as any } }] : []),
+          ...(dateRange ? [{ createdAt: dateRange }] : []),
+          { customer: { is: { OR: [
+            { companyName: { contains: query, mode: "insensitive" as const } },
+            { contactPerson: { contains: query, mode: "insensitive" as const } },
+            { phone: { contains: query, mode: "insensitive" as const } },
+            { nrc: { contains: query, mode: "insensitive" as const } },
+            { whatsappNumber: { contains: query, mode: "insensitive" as const } },
+            { user: { is: { OR: [
+              { firstName: { contains: query, mode: "insensitive" as const } },
+              { lastName: { contains: query, mode: "insensitive" as const } },
+              { email: { contains: query, mode: "insensitive" as const } },
+              { phone: { contains: query, mode: "insensitive" as const } },
+            ] } } },
+          ] } } },
+        ],
+      }
+    : null
+  const where = searchWhere ? { AND: [baseWhere, searchWhere] } : baseWhere
 
   const [quotations, statusGroups] = await Promise.all([
     prisma.quotation.findMany({
@@ -34,7 +75,7 @@ export default async function QuotationsPage() {
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {
-        customer: true,
+        customer: { include: { user: true } },
         createdBy: true,
       },
     }),
@@ -87,7 +128,18 @@ export default async function QuotationsPage() {
           <CardTitle>{role === "CUSTOMER" ? "Your Quotation Requests" : "Quotation List"}</CardTitle>
           <CardDescription>{role === "CUSTOMER" ? "Only quotations linked to your customer account are shown." : "Latest quotations for this company."}</CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="space-y-4 overflow-x-auto">
+          <form action="/dashboard/quotations" className="flex max-w-2xl items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <input
+              name="q"
+              defaultValue={query}
+              placeholder="Search quotation number, customer name, NRC, phone, or date..."
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+            <button type="submit" className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground">Search</button>
+            {query && <Link href="/dashboard/quotations" className="text-xs text-muted-foreground underline-offset-4 hover:underline">Clear</Link>}
+          </form>
           {quotations.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <FileText className="mx-auto mb-4 h-12 w-12 opacity-50" />

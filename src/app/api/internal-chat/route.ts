@@ -7,6 +7,7 @@ import { isCompanyAdminRole } from "@/lib/tenant"
 const sendMessageSchema = z.object({
   message: z.string().trim().max(2000, "Message is too long").optional().default(""),
   recipientId: z.string().optional().nullable(),
+  roomId: z.string().optional().nullable(),
   replyToId: z.string().optional().nullable(),
   attachmentUrl: z.string().url().optional().nullable(),
   attachmentName: z.string().max(180).optional().nullable(),
@@ -22,7 +23,14 @@ const patchSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("edit"), id: z.string(), message: z.string().trim().min(1).max(2000) }),
   z.object({ action: z.literal("delete"), id: z.string() }),
   z.object({ action: z.literal("pin"), id: z.string(), isPinned: z.boolean() }),
+  z.object({ action: z.literal("profile"), profileImageUrl: z.string().url().nullable() }),
 ])
+
+const createRoomSchema = z.object({
+  name: z.string().trim().min(2, "Room name is required").max(80),
+  description: z.string().trim().max(200).optional().nullable(),
+  memberIds: z.array(z.string()).min(1, "Choose at least one member"),
+})
 
 function canUseInternalChat(role?: string | null) {
   return role === "EMPLOYEE" || role === "CUSTOMER" || isCompanyAdminRole(role)
@@ -30,6 +38,10 @@ function canUseInternalChat(role?: string | null) {
 
 function channelFor(recipientId?: string | null) {
   return recipientId ? `direct:${recipientId}` : "team"
+}
+
+function roomChannel(roomId?: string | null) {
+  return roomId ? `room:${roomId}` : "team"
 }
 
 async function requireChatSession() {
@@ -62,14 +74,14 @@ async function getCompanyChatUsers(companyId: string, viewerId?: string, role?: 
     if (staffIds.length > 0) {
       const staff = await prisma.user.findMany({
         where: { id: { in: staffIds }, companyId, isActive: true, role: { in: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] } },
-        select: { id: true, firstName: true, lastName: true, email: true, role: true },
+            select: { id: true, firstName: true, lastName: true, email: true, role: true, profileImageUrl: true },
         orderBy: [{ role: "asc" }, { firstName: "asc" }],
       })
       if (staff.length > 0) return staff
     }
     return prisma.user.findMany({
       where: { companyId, isActive: true, role: { in: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] } },
-      select: { id: true, firstName: true, lastName: true, email: true, role: true },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true, profileImageUrl: true },
       orderBy: [{ role: "asc" }, { firstName: "asc" }],
     })
   }
@@ -80,7 +92,7 @@ async function getCompanyChatUsers(companyId: string, viewerId?: string, role?: 
       isActive: true,
       role: { in: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
     },
-    select: { id: true, firstName: true, lastName: true, email: true, role: true },
+    select: { id: true, firstName: true, lastName: true, email: true, role: true, profileImageUrl: true },
     orderBy: [{ role: "asc" }, { firstName: "asc" }],
   })
 }
@@ -119,6 +131,24 @@ async function getUnreadSummary(companyId: string, userId: string, role?: string
   }
 }
 
+async function getRooms(companyId: string, userId: string, role?: string | null) {
+  if (role === "CUSTOMER") return []
+  return prisma.internalChatRoom.findMany({
+    where: {
+      companyId,
+      members: { some: { userId } },
+    },
+    orderBy: { updatedAt: "desc" },
+    include: {
+      members: {
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true, role: true, profileImageUrl: true } },
+        },
+      },
+    },
+  })
+}
+
 async function getReplyMap(messages: Array<{ replyToId: string | null }>) {
   const replyIds = Array.from(new Set(messages.map((message) => message.replyToId).filter(Boolean))) as string[]
   if (replyIds.length === 0) return {}
@@ -131,7 +161,7 @@ async function getReplyMap(messages: Array<{ replyToId: string | null }>) {
       attachmentName: true,
       linkLabel: true,
       deletedAt: true,
-      sender: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+      sender: { select: { id: true, firstName: true, lastName: true, email: true, role: true, profileImageUrl: true } },
     },
   })
 
@@ -201,18 +231,25 @@ export async function GET(request: NextRequest) {
   await touchPresence(companyId, userId)
 
   const recipientId = request.nextUrl.searchParams.get("recipientId") || null
+  const roomId = request.nextUrl.searchParams.get("roomId") || null
   const search = request.nextUrl.searchParams.get("q")?.trim() || ""
-  const users = await getCompanyChatUsers(companyId, userId, role)
+  const [users, rooms] = await Promise.all([
+    getCompanyChatUsers(companyId, userId, role),
+    getRooms(companyId, userId, role),
+  ])
 
   if (recipientId && !users.some((user) => user.id === recipientId)) {
     return NextResponse.json({ error: "Recipient not found" }, { status: 404 })
   }
+  const activeRoom = roomId ? rooms.find((room) => room.id === roomId) : null
+  if (roomId && !activeRoom) return NextResponse.json({ error: "Room not found" }, { status: 404 })
 
   if (role === "CUSTOMER" && !recipientId) {
     const unread = await getUnreadSummary(companyId, userId, role)
     const presences = await prisma.internalChatPresence.findMany({ where: { companyId }, select: { userId: true, lastSeenAt: true } })
     return NextResponse.json({
       users,
+      rooms,
       messages: [],
       pinnedMessages: [],
       unread,
@@ -225,12 +262,15 @@ export async function GET(request: NextRequest) {
   const baseWhere = recipientId
     ? {
         companyId,
+        roomId: null,
         OR: [
           { senderId: userId, recipientId },
           { senderId: recipientId, recipientId: userId },
         ],
       }
-    : { companyId, recipientId: null }
+    : roomId
+      ? { companyId, roomId, recipientId: null }
+      : { companyId, roomId: null, recipientId: null }
 
   const where = search
     ? { ...baseWhere, deletedAt: null, message: { contains: search, mode: "insensitive" as const } }
@@ -241,8 +281,8 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: "asc" },
     take: 250,
     include: {
-      sender: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
-      recipient: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+      sender: { select: { id: true, firstName: true, lastName: true, email: true, role: true, profileImageUrl: true } },
+      recipient: { select: { id: true, firstName: true, lastName: true, email: true, role: true, profileImageUrl: true } },
     },
   })
 
@@ -253,7 +293,7 @@ export async function GET(request: NextRequest) {
     data: { isRead: true, readAt: new Date() },
   })
 
-  const channel = recipientId ? channelFor(userId) : "team"
+  const channel = recipientId ? channelFor(userId) : roomChannel(roomId)
   const now = new Date()
   await prisma.internalChatTyping.deleteMany({ where: { expiresAt: { lt: now } } })
 
@@ -278,6 +318,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     users,
+    rooms,
     messages: messages.map((message) => ({ ...message, replyTo: message.replyToId ? replyMap[message.replyToId] || null : null })),
     pinnedMessages,
     unread,
@@ -300,14 +341,19 @@ export async function POST(request: NextRequest) {
 
   const input = parsed.data
   const recipientId = input.recipientId || null
+  const roomId = input.roomId || null
   if (role === "CUSTOMER" && !recipientId) {
     return NextResponse.json({ error: "Choose a staff member to message" }, { status: 400 })
   }
+  if (recipientId && roomId) return NextResponse.json({ error: "Choose either a room or direct recipient" }, { status: 400 })
 
   const users = await getCompanyChatUsers(companyId, senderId, role)
   if (recipientId && !users.some((user) => user.id === recipientId && user.id !== senderId)) {
     return NextResponse.json({ error: "Recipient not found" }, { status: 404 })
   }
+  const rooms = await getRooms(companyId, senderId, role)
+  const activeRoom = roomId ? rooms.find((room) => room.id === roomId) : null
+  if (roomId && !activeRoom) return NextResponse.json({ error: "Room not found" }, { status: 404 })
 
   if (input.replyToId) {
     const reply = await prisma.internalChatMessage.findFirst({ where: { id: input.replyToId, companyId }, select: { id: true } })
@@ -325,6 +371,7 @@ export async function POST(request: NextRequest) {
   const message = await prisma.internalChatMessage.create({
     data: {
       companyId,
+      roomId,
       senderId,
       recipientId,
       message: input.message || "",
@@ -337,14 +384,20 @@ export async function POST(request: NextRequest) {
       linkLabel: input.linkLabel || null,
     },
     include: {
-      sender: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
-      recipient: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+      sender: { select: { id: true, firstName: true, lastName: true, email: true, role: true, profileImageUrl: true } },
+      recipient: { select: { id: true, firstName: true, lastName: true, email: true, role: true, profileImageUrl: true } },
     },
   })
 
   const senderName = `${message.sender.firstName} ${message.sender.lastName}`.trim() || message.sender.email
   const preview = input.message || input.attachmentName || input.linkLabel || "Sent an attachment"
-  const notificationUsers = recipientId ? [recipientId] : users.filter((user) => user.id !== senderId).map((user) => user.id)
+  const notificationUsers = recipientId
+    ? [recipientId]
+    : activeRoom
+      ? activeRoom.members.length > 0
+        ? activeRoom.members.map((member) => member.userId).filter((id) => id !== senderId)
+        : users.filter((user) => user.id !== senderId).map((user) => user.id)
+      : users.filter((user) => user.id !== senderId).map((user) => user.id)
 
   if (notificationUsers.length > 0) {
     await prisma.notification.createMany({
@@ -352,10 +405,10 @@ export async function POST(request: NextRequest) {
         companyId,
         userId: notifyUserId,
         type: "SYSTEM_ALERT",
-        title: recipientId ? "New direct chat message" : "New team chat message",
+        title: recipientId ? "New direct chat message" : activeRoom ? `New message in ${activeRoom.name}` : "New team chat message",
         message: `${senderName}: ${preview.slice(0, 140)}`,
-        relatedId: message.id,
-        relatedModel: "InternalChatMessage",
+        relatedId: roomId || message.id,
+        relatedModel: roomId ? "InternalChatRoom" : "InternalChatMessage",
       })),
     })
   }
@@ -371,6 +424,15 @@ export async function PATCH(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.errors }, { status: 400 })
+
+  if (parsed.data.action === "profile") {
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { profileImageUrl: parsed.data.profileImageUrl },
+      select: { id: true, profileImageUrl: true },
+    })
+    return NextResponse.json({ data: updated })
+  }
 
   const existing = await prisma.internalChatMessage.findFirst({ where: { id: parsed.data.id, companyId } })
   if (!existing) return NextResponse.json({ error: "Message not found" }, { status: 404 })
@@ -399,4 +461,47 @@ export async function PATCH(request: NextRequest) {
     data: { isPinned: parsed.data.isPinned },
   })
   return NextResponse.json({ data: updated })
+}
+
+export async function PUT(request: NextRequest) {
+  const auth = await requireChatSession()
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { companyId, userId, role } = auth
+  if (!isCompanyAdminRole(role)) return NextResponse.json({ error: "Only admins can create rooms" }, { status: 403 })
+
+  const body = await request.json().catch(() => ({}))
+  const parsed = createRoomSchema.safeParse(body)
+  if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.errors }, { status: 400 })
+
+  const memberIds = Array.from(new Set([userId, ...parsed.data.memberIds]))
+  const validUsers = await prisma.user.findMany({
+    where: { id: { in: memberIds }, companyId, isActive: true, role: { in: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] } },
+    select: { id: true },
+  })
+  const validIds = validUsers.map((user) => user.id)
+  if (validIds.length === 0) return NextResponse.json({ error: "No valid room members found" }, { status: 400 })
+
+  const room = await prisma.internalChatRoom.create({
+    data: {
+      companyId,
+      name: parsed.data.name,
+      description: parsed.data.description || null,
+      createdById: userId,
+      members: {
+        createMany: {
+          data: validIds.map((memberId) => ({ companyId, userId: memberId, addedById: userId })),
+          skipDuplicates: true,
+        },
+      },
+    },
+    include: {
+      members: {
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true, role: true, profileImageUrl: true } },
+        },
+      },
+    },
+  })
+
+  return NextResponse.json({ data: room }, { status: 201 })
 }

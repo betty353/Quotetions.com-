@@ -7,7 +7,7 @@ import { isCompanyAdminRole } from "@/lib/tenant"
 import InternalChatPanel from "@/components/chat/InternalChatPanel"
 
 interface InternalChatPageProps {
-  searchParams?: Promise<{ recipientId?: string }>
+  searchParams?: Promise<{ recipientId?: string; roomId?: string }>
 }
 
 async function getCustomerChatUsers(companyId: string, userId: string) {
@@ -30,7 +30,7 @@ async function getCustomerChatUsers(companyId: string, userId: string) {
   if (staffIds.length > 0) {
     const staff = await prisma.user.findMany({
       where: { id: { in: staffIds }, companyId, isActive: true, role: { in: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] } },
-      select: { id: true, firstName: true, lastName: true, email: true, role: true },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true, profileImageUrl: true },
       orderBy: [{ role: "asc" }, { firstName: "asc" }],
     })
     if (staff.length > 0) return staff
@@ -38,7 +38,7 @@ async function getCustomerChatUsers(companyId: string, userId: string) {
 
   return prisma.user.findMany({
     where: { companyId, isActive: true, role: { in: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"] } },
-    select: { id: true, firstName: true, lastName: true, email: true, role: true },
+    select: { id: true, firstName: true, lastName: true, email: true, role: true, profileImageUrl: true },
     orderBy: [{ role: "asc" }, { firstName: "asc" }],
   })
 }
@@ -63,11 +63,12 @@ export default async function InternalChatPage({ searchParams }: InternalChatPag
           isActive: true,
           role: { in: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
         },
-        select: { id: true, firstName: true, lastName: true, email: true, role: true },
+        select: { id: true, firstName: true, lastName: true, email: true, role: true, profileImageUrl: true },
         orderBy: [{ role: "asc" }, { firstName: "asc" }],
       })
 
   const requestedRecipientId = resolvedSearchParams?.recipientId
+  const requestedRoomId = resolvedSearchParams?.roomId || ""
   const initialRecipientId = role === "CUSTOMER"
     ? users.find((user) => user.id === requestedRecipientId)?.id || users[0]?.id || ""
     : users.find((user) => user.id === requestedRecipientId)?.id || ""
@@ -93,6 +94,7 @@ export default async function InternalChatPage({ searchParams }: InternalChatPag
         userRole={role}
         allowTeam={role !== "CUSTOMER"}
         initialRecipientId={initialRecipientId}
+        initialRoomId={role === "CUSTOMER" ? "" : requestedRoomId}
       />
     </div>
   )

@@ -3,7 +3,7 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
 import Link from "next/link"
-import { Edit3, FileText, ImageIcon, Link2, MessageCircle, Mic, MoreHorizontal, Paperclip, Pin, PinOff, Reply, Search, Send, Trash2, Users, X } from "lucide-react"
+import { Camera, Edit3, FileText, ImageIcon, Link2, MessageCircle, Mic, MoreHorizontal, Paperclip, PhoneCall, Pin, PinOff, Plus, Reply, Search, Send, Trash2, Users, X } from "lucide-react"
 import { playSentMessageTone } from "@/lib/client-sounds"
 
 type ChatUser = {
@@ -12,6 +12,15 @@ type ChatUser = {
   lastName: string
   email: string
   role: string
+  profileImageUrl?: string | null
+}
+
+type ChatRoom = {
+  id: string
+  name: string
+  description?: string | null
+  isDefault: boolean
+  members: Array<{ userId: string; user: ChatUser }>
 }
 
 type ChatMessage = {
@@ -62,6 +71,7 @@ type InternalChatPanelProps = {
   userRole?: string
   allowTeam?: boolean
   initialRecipientId?: string
+  initialRoomId?: string
 }
 
 type ChatUnreadSummary = {
@@ -113,9 +123,11 @@ function readFileAsDataUrl(file: File) {
   })
 }
 
-export default function InternalChatPanel({ currentUserId, initialUsers, userRole, allowTeam = true, initialRecipientId = "" }: InternalChatPanelProps) {
+export default function InternalChatPanel({ currentUserId, initialUsers, userRole, allowTeam = true, initialRecipientId = "", initialRoomId = "" }: InternalChatPanelProps) {
   const [users, setUsers] = useState(initialUsers)
   const [recipientId, setRecipientId] = useState<string>(initialRecipientId)
+  const [roomId, setRoomId] = useState<string>(initialRoomId)
+  const [rooms, setRooms] = useState<ChatRoom[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [pinnedMessages, setPinnedMessages] = useState<ChatMessage[]>([])
   const [message, setMessage] = useState("")
@@ -125,6 +137,10 @@ export default function InternalChatPanel({ currentUserId, initialUsers, userRol
   const [selectedLink, setSelectedLink] = useState<LinkedRecord | null>(null)
   const [linkables, setLinkables] = useState<LinkedRecord[]>([])
   const [showLinkPicker, setShowLinkPicker] = useState(false)
+  const [showRoomCreator, setShowRoomCreator] = useState(false)
+  const [roomName, setRoomName] = useState("")
+  const [roomDescription, setRoomDescription] = useState("")
+  const [roomMemberIds, setRoomMemberIds] = useState<string[]>([])
   const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -137,8 +153,11 @@ export default function InternalChatPanel({ currentUserId, initialUsers, userRol
   const endRef = useRef<HTMLDivElement>(null)
 
   const directUsers = useMemo(() => users.filter((user) => user.id !== currentUserId), [currentUserId, users])
+  const currentUser = users.find((user) => user.id === currentUserId) || initialUsers.find((user) => user.id === currentUserId)
   const activeUser = directUsers.find((user) => user.id === recipientId)
+  const activeRoom = rooms.find((room) => room.id === roomId)
   const customerMode = userRole === "CUSTOMER" || !allowTeam
+  const canManageRooms = ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"].includes(userRole || "")
   const linkSearch = query.toLowerCase()
   const filteredLinkables = linkables.filter((item) => item.label.toLowerCase().includes(linkSearch)).slice(0, 10)
   const typingNames = typingUserIds
@@ -146,7 +165,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers, userRol
     .filter(Boolean)
     .map((user) => displayName(user))
 
-  async function loadMessages(nextRecipientId = recipientId, searchText = query) {
+  async function loadMessages(nextRecipientId = recipientId, searchText = query, nextRoomId = roomId) {
     if (!allowTeam && !nextRecipientId) {
       setMessages([])
       setPinnedMessages([])
@@ -157,6 +176,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers, userRol
 
     const search = new URLSearchParams()
     if (nextRecipientId) search.set("recipientId", nextRecipientId)
+    if (!nextRecipientId && nextRoomId) search.set("roomId", nextRoomId)
     if (searchText.trim()) search.set("q", searchText.trim())
     const res = await fetch(`/api/internal-chat${search.toString() ? `?${search}` : ""}`, {
       credentials: "include",
@@ -170,6 +190,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers, userRol
 
     const json = await res.json()
     setUsers(json.users || [])
+    setRooms(json.rooms || [])
     setMessages(json.messages || [])
     setPinnedMessages(json.pinnedMessages || [])
     setUnread(json.unread || { total: 0, team: 0, directByUserId: {} })
@@ -190,7 +211,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers, userRol
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ recipientId: recipientId || null }),
+        body: JSON.stringify({ recipientId: recipientId || null, roomId: recipientId ? null : roomId || null }),
       })
     } catch {
       // Typing indicators are best-effort.
@@ -266,6 +287,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers, userRol
       body: JSON.stringify({
         message: body,
         recipientId: recipientId || null,
+        roomId: recipientId ? null : roomId || null,
         replyToId: replyTo?.id || null,
         attachmentUrl: attachment?.url || null,
         attachmentName: attachment?.name || null,
@@ -314,10 +336,83 @@ export default function InternalChatPanel({ currentUserId, initialUsers, userRol
   function switchChannel(nextRecipientId: string) {
     if (!allowTeam && !nextRecipientId) return
     setRecipientId(nextRecipientId)
+    if (nextRecipientId) setRoomId("")
     setReplyTo(null)
     setEditing(null)
     setMessage("")
     setQuery("")
+  }
+
+  function switchRoom(nextRoomId: string) {
+    if (!allowTeam) return
+    setRoomId(nextRoomId)
+    setRecipientId("")
+    setReplyTo(null)
+    setEditing(null)
+    setMessage("")
+    setQuery("")
+  }
+
+  async function saveProfileImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+    setUploading(true)
+    setError("")
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      const res = await fetch("/api/uploads/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ base64Image: dataUrl, folder: "astro-city/chat-profiles" }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Upload failed")
+      const url = json.data?.secure_url || json.data?.url
+      const patch = await fetch("/api/internal-chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "profile", profileImageUrl: url }),
+      })
+      if (!patch.ok) throw new Error("Could not save profile picture")
+      await loadMessages()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Profile image upload failed.")
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function createRoom() {
+    if (!roomName.trim() || roomMemberIds.length === 0) return
+    setSending(true)
+    setError("")
+    const res = await fetch("/api/internal-chat", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ name: roomName, description: roomDescription, memberIds: roomMemberIds }),
+    })
+    const json = await res.json()
+    setSending(false)
+    if (!res.ok) {
+      setError(json.error || "Could not create room.")
+      return
+    }
+    setRoomName("")
+    setRoomDescription("")
+    setRoomMemberIds([])
+    setShowRoomCreator(false)
+    switchRoom(json.data.id)
+    await loadMessages("", "", json.data.id)
+  }
+
+  function openVideoCall() {
+    const label = activeUser ? `direct-${[currentUserId, activeUser.id].sort().join("-")}` : `room-${roomId || "team"}`
+    const safeLabel = label.replace(/[^a-zA-Z0-9-]/g, "-")
+    window.open(`https://meet.jit.si/AstroCityCRM-${safeLabel}`, "_blank", "noopener,noreferrer")
   }
 
   useEffect(() => {
@@ -325,7 +420,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers, userRol
     const timer = window.setInterval(() => loadMessages(), 3000)
     return () => window.clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recipientId])
+  }, [recipientId, roomId])
 
   useEffect(() => {
     const timer = window.setTimeout(() => loadMessages(recipientId, query), 350)
@@ -340,34 +435,90 @@ export default function InternalChatPanel({ currentUserId, initialUsers, userRol
   let lastDay = ""
 
   return (
-    <div className="grid min-h-[740px] overflow-hidden rounded-xl border bg-white lg:grid-cols-[330px_1fr]">
-      <aside className="border-b bg-slate-50 lg:border-b-0 lg:border-r">
+    <div className="grid h-[calc(100vh-210px)] min-h-[620px] overflow-hidden rounded-xl border bg-white lg:grid-cols-[330px_1fr]">
+      <aside className="min-h-0 overflow-y-auto border-b bg-slate-50 lg:border-b-0 lg:border-r">
         <div className="border-b bg-white p-4">
-          <h2 className="flex items-center gap-2 font-semibold">
-            <MessageCircle className="h-5 w-5 text-blue-600" />
-            {customerMode ? "Support Chat" : "Company Chat"}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {customerMode ? "Message the team member helping with your request." : "Admins and workers can coordinate in real time."}
-          </p>
+          <div className="flex items-center gap-3">
+            <UserAvatar user={currentUser} size="lg" />
+            <div className="min-w-0 flex-1">
+              <h2 className="flex items-center gap-2 font-semibold">
+                <MessageCircle className="h-5 w-5 text-blue-600" />
+                {customerMode ? "Support Chat" : "Company Chat"}
+              </h2>
+              <p className="mt-1 truncate text-sm text-muted-foreground">
+                {customerMode ? "Message the team member helping with your request." : "Business rooms, direct messages, and calls."}
+              </p>
+            </div>
+            {!customerMode && (
+              <label className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border bg-card hover:bg-accent" title="Add profile picture">
+                <Camera className="h-4 w-4 text-blue-600" />
+                <input type="file" accept="image/*" className="hidden" onChange={saveProfileImage} disabled={uploading} />
+              </label>
+            )}
+          </div>
         </div>
 
         <div className="space-y-4 p-3">
           {allowTeam && (
-            <button
-              type="button"
-              onClick={() => switchChannel("")}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors ${recipientId === "" ? "bg-neutral-950 text-white" : "hover:bg-white"}`}
-            >
-              <span className={`flex h-10 w-10 items-center justify-center rounded-full ${recipientId === "" ? "bg-white/15" : "bg-blue-50"}`}>
-                <Users className={`h-5 w-5 ${recipientId === "" ? "text-white" : "text-blue-600"}`} />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold">Team room</span>
-                <span className={`block truncate text-xs ${recipientId === "" ? "text-white/70" : "text-muted-foreground"}`}>Everyone in admin and worker roles</span>
-              </span>
-              {unread.team > 0 && recipientId !== "" && <UnreadBadge count={unread.team} />}
-            </button>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Business rooms</p>
+                {canManageRooms && (
+                  <button type="button" onClick={() => setShowRoomCreator((value) => !value)} className="inline-flex h-7 w-7 items-center justify-center rounded-lg border bg-card hover:bg-accent" title="Create room">
+                    <Plus className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {showRoomCreator && (
+                <div className="space-y-2 rounded-xl border bg-white p-3">
+                  <input value={roomName} onChange={(event) => setRoomName(event.target.value)} placeholder="Room name" className="h-9 w-full rounded-lg border bg-card px-3 text-sm outline-none" />
+                  <input value={roomDescription} onChange={(event) => setRoomDescription(event.target.value)} placeholder="Description" className="h-9 w-full rounded-lg border bg-card px-3 text-sm outline-none" />
+                  <div className="max-h-32 space-y-1 overflow-y-auto">
+                    {directUsers.map((user) => (
+                      <label key={user.id} className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm hover:bg-slate-50">
+                        <input
+                          type="checkbox"
+                          checked={roomMemberIds.includes(user.id)}
+                          onChange={(event) => setRoomMemberIds((ids) => event.target.checked ? [...ids, user.id] : ids.filter((id) => id !== user.id))}
+                        />
+                        <span className="truncate">{displayName(user)}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <button type="button" onClick={createRoom} disabled={sending || !roomName.trim() || roomMemberIds.length === 0} className="h-9 w-full rounded-lg bg-neutral-950 text-sm font-semibold text-white disabled:opacity-50">Create room</button>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => switchRoom("")}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors ${!recipientId && roomId === "" ? "bg-neutral-950 text-white" : "hover:bg-white"}`}
+              >
+                <span className={`flex h-10 w-10 items-center justify-center rounded-full ${!recipientId && roomId === "" ? "bg-white/15" : "bg-blue-50"}`}>
+                  <Users className={`h-5 w-5 ${!recipientId && roomId === "" ? "text-white" : "text-blue-600"}`} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold">Team room</span>
+                  <span className={`block truncate text-xs ${!recipientId && roomId === "" ? "text-white/70" : "text-muted-foreground"}`}>Everyone in admin and worker roles</span>
+                </span>
+                {unread.team > 0 && (recipientId !== "" || roomId !== "") && <UnreadBadge count={unread.team} />}
+              </button>
+              {rooms.map((room) => (
+                <button
+                  key={room.id}
+                  type="button"
+                  onClick={() => switchRoom(room.id)}
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors ${!recipientId && roomId === room.id ? "bg-neutral-950 text-white" : "hover:bg-white"}`}
+                >
+                  <span className={`flex h-10 w-10 items-center justify-center rounded-full ${!recipientId && roomId === room.id ? "bg-white/15" : "bg-blue-50"}`}>
+                    <Users className={`h-5 w-5 ${!recipientId && roomId === room.id ? "text-white" : "text-blue-600"}`} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{room.name}</span>
+                    <span className={`block truncate text-xs ${!recipientId && roomId === room.id ? "text-white/70" : "text-muted-foreground"}`}>{room.description || `${room.members.length} members`}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
           )}
 
           <div className="relative">
@@ -394,8 +545,8 @@ export default function InternalChatPanel({ currentUserId, initialUsers, userRol
                     onClick={() => switchChannel(user.id)}
                     className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors ${recipientId === user.id ? "bg-white shadow-sm ring-1 ring-border" : "hover:bg-white"}`}
                   >
-                    <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-neutral-900 text-sm font-semibold text-white">
-                      {displayName(user).charAt(0).toUpperCase()}
+                    <span className="relative">
+                      <UserAvatar user={user} />
                       <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${online ? "bg-emerald-500" : "bg-slate-300"}`} />
                     </span>
                     <span className="min-w-0">
@@ -411,16 +562,22 @@ export default function InternalChatPanel({ currentUserId, initialUsers, userRol
         </div>
       </aside>
 
-      <section className="flex min-h-[740px] flex-col">
+      <section className="flex min-h-0 flex-col overflow-hidden">
         <div className="border-b bg-white p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="font-semibold">{activeUser ? displayName(activeUser) : allowTeam ? "Team room" : "Support chat"}</h1>
+              <h1 className="font-semibold">{activeUser ? displayName(activeUser) : allowTeam ? activeRoom?.name || "Team room" : "Support chat"}</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                {activeUser ? `${isOnline(presences[activeUser.id]) ? "Online" : "Offline"} | Direct chat` : allowTeam ? "Company-wide admin and worker messages" : "Choose a staff member to start messaging"}
+                {activeUser ? `${isOnline(presences[activeUser.id]) ? "Online" : "Offline"} | Direct chat` : allowTeam ? activeRoom?.description || "Company-wide business messages" : "Choose a staff member to start messaging"}
               </p>
             </div>
-            <div className="rounded-full border px-3 py-1 text-xs text-muted-foreground">{messages.length} messages</div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={openVideoCall} disabled={!activeUser && !allowTeam && !roomId} className="inline-flex h-9 items-center gap-2 rounded-lg border bg-card px-3 text-xs font-semibold hover:bg-accent disabled:opacity-50">
+                <PhoneCall className="h-4 w-4 text-emerald-600" />
+                Video call
+              </button>
+              <div className="rounded-full border px-3 py-1 text-xs text-muted-foreground">{messages.length} messages</div>
+            </div>
           </div>
 
           {pinnedMessages.length > 0 && (
@@ -435,7 +592,7 @@ export default function InternalChatPanel({ currentUserId, initialUsers, userRol
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-[#f7f7f5] p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-[#f7f7f5] p-4">
           {loading ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading chat...</div>
           ) : messages.length === 0 ? (
@@ -573,7 +730,7 @@ function MessageBubble({ item, currentUserId, onReply, onEdit, onDelete, onPin }
             <IconAction label="Reply" onClick={onReply} icon={<Reply className="h-3.5 w-3.5" />} />
             <IconAction label={item.isPinned ? "Unpin" : "Pin"} onClick={onPin} icon={item.isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />} />
             {mine && <IconAction label="Edit" onClick={onEdit} icon={<Edit3 className="h-3.5 w-3.5" />} />}
-            {(mine || true) && <IconAction label="Delete" onClick={onDelete} icon={<Trash2 className="h-3.5 w-3.5" />} />}
+            {mine && <IconAction label="Delete" onClick={onDelete} icon={<Trash2 className="h-3.5 w-3.5" />} />}
           </div>
         )}
       </div>
@@ -605,6 +762,24 @@ function AttachmentPreview({ item, mine }: { item: ChatMessage; mine: boolean })
       {type.includes("pdf") ? <FileText className="h-4 w-4" /> : type.startsWith("image/") ? <ImageIcon className="h-4 w-4" /> : <Paperclip className="h-4 w-4" />}
       <span className="truncate">{name}</span>
     </a>
+  )
+}
+
+function UserAvatar({ user, size = "md" }: { user?: ChatUser | null; size?: "md" | "lg" }) {
+  const classes = size === "lg" ? "h-12 w-12 text-base" : "h-10 w-10 text-sm"
+  const name = displayName(user)
+  if (user?.profileImageUrl) {
+    return (
+      <span className={`flex shrink-0 overflow-hidden rounded-full border bg-white ${classes}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={user.profileImageUrl} alt={`${name} profile`} className="h-full w-full object-cover" />
+      </span>
+    )
+  }
+  return (
+    <span className={`flex shrink-0 items-center justify-center rounded-full bg-neutral-900 font-semibold text-white ${classes}`}>
+      {name.charAt(0).toUpperCase()}
+    </span>
   )
 }
 
