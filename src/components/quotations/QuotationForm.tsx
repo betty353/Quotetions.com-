@@ -85,7 +85,6 @@ export default function QuotationForm({ products, customers, customerRole, mode 
         customerId: values.customerId,
         items: values.items,
         notes: isPurchaseOrder ? `Purchase order request. ${values.notes || ""}`.trim() : values.notes,
-        terms: values.terms,
         validUntil: validUntilValue ? new Date(validUntilValue).toISOString() : undefined,
       }
 
@@ -214,13 +213,6 @@ export default function QuotationForm({ products, customers, customerRole, mode 
         <Label htmlFor="notes">{isPurchaseOrder ? "Purchase Order Notes" : "Customer Notes"}</Label>
         <Textarea id="notes" {...register("notes")} rows={4} />
       </div>
-
-      {!isCustomer && (
-      <div>
-        <Label htmlFor="terms">Terms</Label>
-        <Textarea id="terms" {...register("terms")} rows={4} />
-      </div>
-      )}
 
       {isCustomer && (
         <label className="flex items-start gap-3 rounded-lg border bg-slate-50 p-3 text-sm">
