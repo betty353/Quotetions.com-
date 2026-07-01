@@ -41,14 +41,6 @@ export default function CustomerQuotationActions({
     }
   }
 
-  if (isPaid) {
-    return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-        This quotation is paid. Your receipt is available below.
-      </div>
-    )
-  }
-
   if (status === "APPROVED") {
     return (
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
@@ -61,6 +53,38 @@ export default function CustomerQuotationActions({
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
         You rejected this quotation. Contact the company if you need a revised quotation.
+      </div>
+    )
+  }
+
+  if (status === "PROCESSING") {
+    return (
+      <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-800">
+        Your order is being processed by the company.
+      </div>
+    )
+  }
+
+  if (status === "READY") {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        Your order is ready. Contact the company for collection or delivery details.
+      </div>
+    )
+  }
+
+  if (status === "COMPLETED") {
+    return (
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+        This order is completed. Your receipt is available below.
+      </div>
+    )
+  }
+
+  if (isPaid) {
+    return (
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+        This quotation is paid. Your receipt is available below.
       </div>
     )
   }

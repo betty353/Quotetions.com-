@@ -52,7 +52,7 @@ export default function QuotationStatusForm({ quotationId, currentStatus }: Prop
       <div>
         <Label htmlFor="status">Status</Label>
         <select id="status" {...register("status")} className="w-full rounded border p-2">
-          {['DRAFT','SENT','VIEWED','APPROVED','REJECTED','EXPIRED','COMPLETED'].map((s) => (
+          {['DRAFT','SENT','VIEWED','APPROVED','PROCESSING','READY','REJECTED','EXPIRED','COMPLETED'].map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}
         </select>

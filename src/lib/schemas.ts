@@ -261,7 +261,7 @@ export const createFollowUpSchema = z.object({
 })
 
 export const updateQuotationStatusSchema = z.object({
-  status: z.enum(["DRAFT", "SENT", "VIEWED", "APPROVED", "REJECTED", "EXPIRED", "COMPLETED"]),
+  status: z.enum(["DRAFT", "SENT", "VIEWED", "APPROVED", "PROCESSING", "READY", "REJECTED", "EXPIRED", "COMPLETED"]),
   rejectionReason: z.string().optional(),
   notes: z.string().optional(),
   terms: z.string().optional(),

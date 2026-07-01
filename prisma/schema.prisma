@@ -24,6 +24,8 @@ enum QuotationStatus {
   SENT
   VIEWED
   APPROVED
+  PROCESSING
+  READY
   REJECTED
   EXPIRED
   COMPLETED

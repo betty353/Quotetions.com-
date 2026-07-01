@@ -19,7 +19,12 @@ export default async function InvoicesPage() {
   const companyId = (session.user as any).companyId as string | null
   if (!isCompanyAdminRole(role)) redirect("/dashboard")
 
-  const where: any = {}
+  const where: any = {
+    OR: [
+      { status: { in: ["APPROVED", "PROCESSING", "READY", "COMPLETED"] } },
+      { paymentStatus: { in: ["PARTIAL", "COMPLETED"] } },
+    ],
+  }
   if (companyId) {
     where.companyId = companyId
   } else {

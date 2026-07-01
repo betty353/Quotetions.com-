@@ -16,7 +16,7 @@ export function getPaymentState(total: number, paid: number) {
       paid: normalizedPaid,
       outstanding: 0,
       paymentStatus: "COMPLETED" as const,
-      quotationStatus: "COMPLETED" as const,
+      quotationStatus: null,
     }
   }
 
@@ -336,7 +336,6 @@ export async function syncCompletedQuotationStock(input: {
     await tx.quotation.update({
       where: { id: quotation.id },
       data: {
-        status: "COMPLETED",
         paymentStatus: "COMPLETED",
         paidAt: quotation.paidAt || new Date(),
       },

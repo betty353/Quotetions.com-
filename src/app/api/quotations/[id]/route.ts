@@ -152,7 +152,7 @@ export async function PUT(
       },
     })
 
-    if (updatedQuotation.status === "APPROVED" || updatedQuotation.status === "REJECTED") {
+    if (["APPROVED", "PROCESSING", "READY", "COMPLETED", "REJECTED"].includes(updatedQuotation.status)) {
       if (role === "CUSTOMER") {
         const companyUsers = await prisma.user.findMany({
           where: {
@@ -178,13 +178,20 @@ export async function PUT(
           })
         }
       } else {
+        const customerTitle =
+          updatedQuotation.status === "APPROVED" ? "Quotation approved" :
+          updatedQuotation.status === "PROCESSING" ? "Order processing" :
+          updatedQuotation.status === "READY" ? "Order ready" :
+          updatedQuotation.status === "COMPLETED" ? "Order completed" :
+          "Quotation rejected"
+
         await prisma.notification.create({
           data: {
             companyId: existing.companyId,
             userId: existing.customer.userId,
             type: updatedQuotation.status === "APPROVED" ? "QUOTATION_APPROVED" : "SYSTEM_ALERT",
-            title: updatedQuotation.status === "APPROVED" ? "Quotation approved" : "Quotation rejected",
-            message: `Quotation ${existing.quotationNumber} is now ${updatedQuotation.status}.`,
+            title: customerTitle,
+            message: `${existing.quotationNumber} is now ${updatedQuotation.status}.`,
             relatedId: existing.id,
             relatedModel: "Quotation",
             customerId: existing.customerId,
