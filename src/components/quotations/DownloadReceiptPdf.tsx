@@ -91,15 +91,15 @@ function drawWatermark(doc: jsPDF, logoData: string | null, companyName: string)
   const pageHeight = doc.internal.pageSize.getHeight()
 
   if (logoData) {
-    const rendered = tryWithOpacity(doc, 0.075, () => {
-      drawImageContain(doc, logoData, pageWidth / 2 - 138, pageHeight / 2 - 118, 276, 236)
+    const rendered = tryWithOpacity(doc, 0.14, () => {
+      drawImageContain(doc, logoData, pageWidth / 2 - 170, pageHeight / 2 - 135, 340, 270)
     })
     if (rendered) return
   }
 
-  doc.setTextColor(238, 238, 238)
+  doc.setTextColor(218, 218, 218)
   doc.setFont("Helvetica", "bold")
-  doc.setFontSize(48)
+  doc.setFontSize(58)
   doc.text(companyName.slice(0, 28).toUpperCase(), pageWidth / 2, pageHeight / 2, {
     align: "center",
     angle: -28,

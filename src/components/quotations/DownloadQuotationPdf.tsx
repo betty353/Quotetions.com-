@@ -94,14 +94,14 @@ function drawWatermark(doc: jsPDF, logoData: string | null, companyName: string)
   const pageHeight = doc.internal.pageSize.getHeight()
 
   if (logoData) {
-    const rendered = tryWithOpacity(doc, 0.07, () => {
-      drawImageContain(doc, logoData, pageWidth / 2 - 130, pageHeight / 2 - 110, 260, 220)
+    const rendered = tryWithOpacity(doc, 0.14, () => {
+      drawImageContain(doc, logoData, pageWidth / 2 - 170, pageHeight / 2 - 135, 340, 270)
     })
     if (rendered) return
   }
 
-  doc.setTextColor(238, 238, 238)
-  doc.setFontSize(46)
+  doc.setTextColor(218, 218, 218)
+  doc.setFontSize(58)
   doc.setFont("Helvetica", "bold")
   doc.text(companyName.slice(0, 28).toUpperCase(), pageWidth / 2, pageHeight / 2, {
     align: "center",
@@ -135,7 +135,15 @@ function drawShell(doc: jsPDF, setting: PdfSetting, logoData: string | null, tit
   }
 
   if (logoData) {
-    drawImageContain(doc, logoData, isInvoice ? 40 : pageWidth - 148, 24, isInvoice ? 120 : 108, 56)
+    if (isInvoice) {
+      doc.setFillColor(255, 255, 255)
+      doc.roundedRect(34, 20, 132, 64, 12, 12, "F")
+      drawImageContain(doc, logoData, 42, 26, 116, 52)
+    } else {
+      doc.setFillColor(255, 255, 255)
+      doc.roundedRect(pageWidth - 154, 18, 120, 68, 10, 10, "F")
+      drawImageContain(doc, logoData, pageWidth - 146, 24, 104, 56)
+    }
   } else {
     doc.setDrawColor(isInvoice ? 255 : 17, isInvoice ? 255 : 24, isInvoice ? 255 : 39)
     doc.setFillColor(isInvoice ? 255 : 248, isInvoice ? 255 : 250, isInvoice ? 255 : 252)
@@ -146,22 +154,44 @@ function drawShell(doc: jsPDF, setting: PdfSetting, logoData: string | null, tit
     doc.text(companyName.slice(0, 1).toUpperCase(), isInvoice ? 66 : pageWidth - 94, 58, { align: "center" })
   }
 
-  doc.setTextColor(isInvoice ? 255 : 17, isInvoice ? 255 : 24, isInvoice ? 255 : 39)
-  doc.setFontSize(isInvoice ? 11 : 10)
-  doc.setFont("Helvetica", "bold")
-  doc.text(companyName, isInvoice ? 178 : 40, 38)
-  doc.setFont("Helvetica", "normal")
-  doc.setTextColor(isInvoice ? 219 : 100, isInvoice ? 234 : 116, isInvoice ? 254 : 139)
-  doc.text(clean(setting.companyEmail, ""), isInvoice ? 178 : 40, 54)
-  doc.text([setting.companyPhone, setting.companyWebsite].filter(Boolean).join(" | "), isInvoice ? 178 : 40, 68)
+  if (isInvoice) {
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(11)
+    doc.setFont("Helvetica", "bold")
+    doc.text(companyName, 178, 38)
+    doc.setFont("Helvetica", "normal")
+    doc.setTextColor(219, 234, 254)
+    doc.text(clean(setting.companyEmail, ""), 178, 54)
+    doc.text([setting.companyPhone, setting.companyWebsite].filter(Boolean).join(" | "), 178, 68)
 
-  doc.setFont("Helvetica", "bold")
-  doc.setFontSize(isInvoice ? 28 : 32)
-  doc.setTextColor(isInvoice ? 20 : 17, isInvoice ? 84 : 24, isInvoice ? 180 : 39)
-  doc.text(title, isInvoice ? pageWidth - 40 : 40, isInvoice ? 136 : 132, { align: isInvoice ? "right" : "left" })
-  doc.setFontSize(10)
-  doc.setTextColor(isInvoice ? 37 : 71, isInvoice ? 99 : 85, isInvoice ? 235 : 105)
-  doc.text(number, isInvoice ? pageWidth - 40 : 42, isInvoice ? 154 : 150, { align: isInvoice ? "right" : "left" })
+    doc.setFont("Helvetica", "bold")
+    doc.setFontSize(28)
+    doc.setTextColor(20, 84, 180)
+    doc.text(title, pageWidth - 40, 136, { align: "right" })
+    doc.setFontSize(10)
+    doc.setTextColor(37, 99, 235)
+    doc.text(number, pageWidth - 40, 154, { align: "right" })
+  } else {
+    const contactLine = [setting.companyPhone, setting.companyWebsite].filter(Boolean).join(" | ")
+    const centerX = pageWidth / 2
+    doc.setTextColor(17, 24, 39)
+    doc.setFontSize(10)
+    doc.setFont("Helvetica", "bold")
+    doc.text(companyName, centerX, 34, { align: "center", maxWidth: 230 })
+    doc.setFont("Helvetica", "normal")
+    doc.setTextColor(82, 82, 91)
+    doc.text(clean(setting.companyEmail, ""), centerX, 50, { align: "center", maxWidth: 230 })
+    doc.setFontSize(8)
+    doc.text(doc.splitTextToSize(contactLine, 240), centerX, 64, { align: "center" })
+
+    doc.setFont("Helvetica", "bold")
+    doc.setFontSize(28)
+    doc.setTextColor(17, 24, 39)
+    doc.text(title, 40, 48)
+    doc.setFontSize(10)
+    doc.setTextColor(71, 85, 105)
+    doc.text(number, 42, 68)
+  }
 
   doc.setFont("Helvetica", "normal")
   doc.setFontSize(8)
