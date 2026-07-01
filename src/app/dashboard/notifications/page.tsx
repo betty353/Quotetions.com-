@@ -80,16 +80,44 @@ async function markAllVisibleRead() {
   revalidatePath("/dashboard/notifications")
 }
 
-export default async function NotificationsPage() {
+async function deleteNotification(formData: FormData) {
+  "use server"
+
+  const session = await getServerSession(authOptions)
+  if (!session) redirect("/dashboard")
+  const id = String(formData.get("id") || "")
+  if (!id) return
+
+  const role = (session.user as any).role
+  const userId = (session.user as any).id
+  const companyId = (session.user as any).companyId as string | null
+  const notification = await prisma.notification.findUnique({ where: { id } })
+  if (!notification) return
+
+  const allowed = isCompanyAdminRole(role)
+    ? !companyId || notification.companyId === companyId
+    : notification.userId === userId
+  if (!allowed) return
+
+  await prisma.notification.delete({ where: { id } })
+  revalidatePath("/dashboard/notifications")
+}
+
+export default async function NotificationsPage({ searchParams }: { searchParams?: Promise<{ status?: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session) redirect("/dashboard")
 
   const role = (session.user as any).role
   const userId = (session.user as any).id
   const companyId = (session.user as any).companyId as string | null
+  const params = await searchParams
+  const status = params?.status || "all"
 
   const notifications = await prisma.notification.findMany({
-    where: isCompanyAdminRole(role) ? { companyId: companyId || undefined } : { userId },
+    where: {
+      ...(isCompanyAdminRole(role) ? { companyId: companyId || undefined } : { userId }),
+      ...(status === "unread" ? { isRead: false } : status === "read" ? { isRead: true } : {}),
+    },
     orderBy: { createdAt: "desc" },
     take: 100,
     include: {
@@ -113,6 +141,22 @@ export default async function NotificationsPage() {
         <form action={markAllVisibleRead}>
           <Button type="submit" variant="outline" disabled={unread === 0}>Mark all read</Button>
         </form>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {[
+          { value: "all", label: "All" },
+          { value: "unread", label: "Unread" },
+          { value: "read", label: "Read" },
+        ].map((item) => (
+          <Link
+            key={item.value}
+            href={`/dashboard/notifications?status=${item.value}`}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium ${status === item.value ? "bg-neutral-950 text-white" : "bg-card hover:bg-accent"}`}
+          >
+            {item.label}
+          </Link>
+        ))}
       </div>
 
       <Card>
@@ -147,12 +191,18 @@ export default async function NotificationsPage() {
                       </div>
                       <p className="mt-2 text-xs font-medium text-blue-600">Open related item</p>
                     </Link>
-                    {!notification.isRead && (
-                      <form action={markNotificationRead}>
+                    <div className="flex gap-2">
+                      {!notification.isRead && (
+                        <form action={markNotificationRead}>
+                          <input type="hidden" name="id" value={notification.id} />
+                          <Button type="submit" variant="outline" size="sm">Mark read</Button>
+                        </form>
+                      )}
+                      <form action={deleteNotification}>
                         <input type="hidden" name="id" value={notification.id} />
-                        <Button type="submit" variant="outline" size="sm">Mark read</Button>
+                        <Button type="submit" variant="ghost" size="sm">Delete</Button>
                       </form>
-                    )}
+                    </div>
                   </div>
                 </div>
               ))}

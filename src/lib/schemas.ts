@@ -260,6 +260,13 @@ export const createFollowUpSchema = z.object({
   reminderDate: z.coerce.date().optional(),
 })
 
+export const updateFollowUpSchema = z.object({
+  status: z.enum(["PENDING", "COMPLETED", "RESCHEDULED", "CANCELLED"]).optional(),
+  feedback: z.string().trim().optional(),
+  nextFollowUpDate: z.coerce.date().optional(),
+  reminderDate: z.coerce.date().optional(),
+})
+
 export const updateQuotationStatusSchema = z.object({
   status: z.enum(["DRAFT", "SENT", "VIEWED", "APPROVED", "PROCESSING", "READY", "REJECTED", "EXPIRED", "COMPLETED"]),
   rejectionReason: z.string().optional(),

@@ -9,6 +9,7 @@ import { isCompanyAdminRole } from "@/lib/tenant"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatDate, formatDateTime } from "@/lib/utils"
+import FollowUpActions from "@/components/followups/FollowUpActions"
 
 function startOfDay(date: Date) {
   const value = new Date(date)
@@ -98,7 +99,7 @@ export default async function FollowupsPage() {
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
             {due.map((followUp) => (
-              <FollowUpCard key={followUp.id} followUp={followUp} urgent />
+              <FollowUpCard key={followUp.id} followUp={followUp} urgent canManage={role !== "CUSTOMER"} />
             ))}
           </CardContent>
         </Card>
@@ -153,7 +154,7 @@ export default async function FollowupsPage() {
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
               {followUps.map((followUp) => (
-                <FollowUpCard key={followUp.id} followUp={followUp} />
+                <FollowUpCard key={followUp.id} followUp={followUp} canManage={role !== "CUSTOMER"} />
               ))}
             </div>
           )}
@@ -172,7 +173,7 @@ function Metric({ title, value, icon }: { title: string; value: string; icon: Re
   )
 }
 
-function FollowUpCard({ followUp, urgent = false }: { followUp: any; urgent?: boolean }) {
+function FollowUpCard({ followUp, urgent = false, canManage = false }: { followUp: any; urgent?: boolean; canManage?: boolean }) {
   return (
     <div className={`rounded-xl border p-4 ${urgent ? "border-red-200 bg-white" : "border-slate-200 bg-slate-50"}`}>
       <div className="flex items-start justify-between gap-3">
@@ -193,6 +194,7 @@ function FollowUpCard({ followUp, urgent = false }: { followUp: any; urgent?: bo
       <Link href={`/dashboard/quotations/${followUp.quotationId}`} className="mt-3 inline-flex text-sm font-medium text-blue-600 hover:underline">
         Open quotation
       </Link>
+      {canManage && <FollowUpActions followUpId={followUp.id} disabled={followUp.status === "COMPLETED" || followUp.status === "CANCELLED"} />}
     </div>
   )
 }

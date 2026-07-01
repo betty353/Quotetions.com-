@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma"
 import requireRole from "@/lib/roles"
 import { createActivityLog, createAuditLog } from "@/lib/finance"
 import { isCompanyAdminRole } from "@/lib/tenant"
+import { updateFollowUpSchema } from "@/lib/schemas"
+import { ZodError } from "zod"
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -10,10 +12,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
-    const body = await request.json()
+    const body = updateFollowUpSchema.parse(await request.json())
     const updateData: any = {}
     if (body.status) updateData.status = body.status
     if (body.feedback !== undefined) updateData.feedback = body.feedback
+    if (body.nextFollowUpDate !== undefined) updateData.nextFollowUpDate = body.nextFollowUpDate
+    if (body.reminderDate !== undefined) {
+      updateData.reminderDate = body.reminderDate
+      updateData.reminderSent = false
+    }
+    if (body.status === "RESCHEDULED") {
+      updateData.status = "PENDING"
+      updateData.reminderSent = false
+    }
 
     const existing = await prisma.followUp.findUnique({
       where: { id },
@@ -76,6 +87,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json({ data: updated })
   } catch (err: unknown) {
+    if (err instanceof ZodError) {
+      return NextResponse.json({ error: "Validation failed", details: err.errors }, { status: 400 })
+    }
     console.error(err)
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed to update follow-up' }, { status: 500 })
   }
