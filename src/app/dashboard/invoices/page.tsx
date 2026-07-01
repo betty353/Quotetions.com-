@@ -98,7 +98,7 @@ export default async function InvoicesPage() {
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <GenerateInvoiceButton quotationId={invoice.id} disabled={invoice.status === "REJECTED" || invoice.status === "EXPIRED"} />
-                        <DownloadQuotationPdf quotationId={invoice.id} />
+                        <DownloadQuotationPdf quotationId={invoice.id} documentType="invoice" />
                       </div>
                     </td>
                   </tr>
