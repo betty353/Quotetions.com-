@@ -15,6 +15,7 @@ import DownloadQuotationPdf from "@/components/quotations/DownloadQuotationPdf"
 import DownloadReceiptPdf from "@/components/quotations/DownloadReceiptPdf"
 import ReconcileButton from "@/components/payments/ReconcileButton"
 import DpoPayButton from "@/components/payments/DpoPayButton"
+import CustomerQuotationActions from "@/components/quotations/CustomerQuotationActions"
 
 interface QuotationPageProps {
   params: Promise<{ id: string }>
@@ -67,6 +68,7 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
   })
   const canUseOnlinePayments = Boolean(paymentSetup?.paymentSetupComplete && paymentSetup.paymentEnabled)
   const isPaid = quotation.paymentStatus === "COMPLETED" || quotation.status === "COMPLETED"
+  const customerCanPay = role !== "CUSTOMER" || quotation.status === "APPROVED"
   const paidReceipt = quotation.receipts.find((receipt) => receipt.receiptNumber === quotation.receiptNumber) || quotation.receipts[0]
   const confirmedPaid = quotation.payments
     .filter((payment) => payment.status === "PARTIAL" || payment.status === "COMPLETED")
@@ -202,12 +204,15 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
                     <div className="mt-4">
                       <DpoPayButton
                         quotationId={quotation.id}
-                        disabled={!canUseOnlinePayments}
+                        disabled={!canUseOnlinePayments || !customerCanPay}
                         transactionToken={quotation.dpoTransactionToken}
                       />
                     </div>
                     {!canUseOnlinePayments && (
                       <p className="mt-2 text-sm text-amber-700">Online payments are not available until the administrator completes Payment Setup.</p>
+                    )}
+                    {role === "CUSTOMER" && !customerCanPay && (
+                      <p className="mt-2 text-sm text-blue-700">Accept this quotation first to unlock online payment.</p>
                     )}
                   </div>
                 )}
@@ -371,6 +376,30 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
                 </CardContent>
               </Card>
             </>
+          )}
+          {role === "CUSTOMER" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Your Actions</CardTitle>
+                <CardDescription>Accept the quotation before paying. You can download the quotation or receipt anytime.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <CustomerQuotationActions quotationId={quotation.id} status={quotation.status} paymentStatus={quotation.paymentStatus} />
+                <div className="grid gap-2">
+                  <DownloadQuotationPdf quotationId={quotation.id} />
+                  {paidReceipt && <DownloadReceiptPdf receiptId={paidReceipt.id} />}
+                  {quotationContactUserId && (
+                    <Link
+                      href={`/dashboard/chat?recipientId=${quotationContactUserId}`}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition-colors hover:bg-slate-50"
+                    >
+                      <MessageCircle className="h-4 w-4 text-blue-600" />
+                      Chat about this quotation
+                    </Link>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>

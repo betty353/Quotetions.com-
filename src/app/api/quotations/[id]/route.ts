@@ -66,7 +66,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const session = await requireRole("ADMIN", "EMPLOYEE")
+  const session = await requireRole("ADMIN", "EMPLOYEE", "CUSTOMER")
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
@@ -82,11 +82,38 @@ export async function PUT(
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
     }
 
+    const role = (session.user as any).role
+    if (role === "CUSTOMER") {
+      const customer = await prisma.customer.findUnique({ where: { userId: session.user.id } })
+      if (!customer || customer.id !== existing.customerId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+      }
+      if (validated.status !== "APPROVED" && validated.status !== "REJECTED") {
+        return NextResponse.json({ error: "Customers can only accept or reject quotations" }, { status: 403 })
+      }
+      if (existing.status === "COMPLETED" || existing.paymentStatus === "COMPLETED") {
+        return NextResponse.json({ error: "Paid quotations cannot be changed" }, { status: 409 })
+      }
+      if (existing.status === "EXPIRED") {
+        return NextResponse.json({ error: "Expired quotations cannot be changed" }, { status: 409 })
+      }
+      if (existing.validUntil && existing.validUntil < new Date()) {
+        return NextResponse.json({ error: "This quotation has expired" }, { status: 409 })
+      }
+    } else {
+      const companyId = (session.user as any).companyId as string | null
+      if (companyId && existing.companyId !== companyId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+      }
+    }
+
     if (validated.status) updateData.status = validated.status
     if (validated.rejectionReason) updateData.rejectionReason = validated.rejectionReason
-    if (validated.notes !== undefined) updateData.notes = validated.notes
-    if (validated.terms !== undefined) updateData.terms = validated.terms
-    if (validated.validUntil !== undefined) updateData.validUntil = validated.validUntil
+    if (role !== "CUSTOMER") {
+      if (validated.notes !== undefined) updateData.notes = validated.notes
+      if (validated.terms !== undefined) updateData.terms = validated.terms
+      if (validated.validUntil !== undefined) updateData.validUntil = validated.validUntil
+    }
     if (validated.status === "VIEWED" && !existing.viewedAt) updateData.viewedAt = new Date()
     if (validated.status === "APPROVED" && !existing.approvedAt) updateData.approvedAt = new Date()
     if (validated.status === "REJECTED" && !existing.rejectedAt) updateData.rejectedAt = new Date()
@@ -104,6 +131,7 @@ export async function PUT(
     })
 
     await createActivityLog({
+      companyId: existing.companyId,
       customerId: existing.customerId,
       userId: session.user.id,
       activityType: "QUOTATION_UPDATED",
@@ -112,6 +140,7 @@ export async function PUT(
       quotationId: existing.id,
     })
     await createAuditLog({
+      companyId: existing.companyId,
       userId: session.user.id,
       action: "UPDATE",
       entity: "Quotation",
@@ -124,18 +153,45 @@ export async function PUT(
     })
 
     if (updatedQuotation.status === "APPROVED" || updatedQuotation.status === "REJECTED") {
-      await prisma.notification.create({
-        data: {
-          userId: existing.customer.userId,
-          type: updatedQuotation.status === "APPROVED" ? "QUOTATION_APPROVED" : "SYSTEM_ALERT",
-          title: updatedQuotation.status === "APPROVED" ? "Quotation approved" : "Quotation rejected",
-          message: `Quotation ${existing.quotationNumber} is now ${updatedQuotation.status}.`,
-          relatedId: existing.id,
-          relatedModel: "Quotation",
-          customerId: existing.customerId,
-          quotationId: existing.id,
-        },
-      })
+      if (role === "CUSTOMER") {
+        const companyUsers = await prisma.user.findMany({
+          where: {
+            companyId: existing.companyId,
+            role: { in: ["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN", "EMPLOYEE"] },
+            isActive: true,
+          },
+          select: { id: true },
+        })
+        if (companyUsers.length > 0) {
+          await prisma.notification.createMany({
+            data: companyUsers.map((user) => ({
+              companyId: existing.companyId,
+              userId: user.id,
+              type: updatedQuotation.status === "APPROVED" ? "QUOTATION_APPROVED" : "SYSTEM_ALERT",
+              title: updatedQuotation.status === "APPROVED" ? "Customer accepted quotation" : "Customer rejected quotation",
+              message: `${existing.customer.companyName || existing.customer.contactPerson || "Customer"} ${updatedQuotation.status === "APPROVED" ? "accepted" : "rejected"} ${existing.quotationNumber}.`,
+              relatedId: existing.id,
+              relatedModel: "Quotation",
+              customerId: existing.customerId,
+              quotationId: existing.id,
+            })),
+          })
+        }
+      } else {
+        await prisma.notification.create({
+          data: {
+            companyId: existing.companyId,
+            userId: existing.customer.userId,
+            type: updatedQuotation.status === "APPROVED" ? "QUOTATION_APPROVED" : "SYSTEM_ALERT",
+            title: updatedQuotation.status === "APPROVED" ? "Quotation approved" : "Quotation rejected",
+            message: `Quotation ${existing.quotationNumber} is now ${updatedQuotation.status}.`,
+            relatedId: existing.id,
+            relatedModel: "Quotation",
+            customerId: existing.customerId,
+            quotationId: existing.id,
+          },
+        })
+      }
     }
 
     return NextResponse.json({ data: updatedQuotation })

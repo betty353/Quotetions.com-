@@ -34,6 +34,9 @@ export async function POST(request: NextRequest) {
       if (!customer || customer.id !== quotation.customerId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
       }
+      if (quotation.status !== "APPROVED") {
+        return NextResponse.json({ error: "Accept the quotation before starting payment" }, { status: 409 })
+      }
     } else if (sessionCompanyId !== quotation.companyId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }

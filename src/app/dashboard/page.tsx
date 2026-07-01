@@ -106,13 +106,27 @@ async function getDashboardData(userId: string, userRole: string, companyId?: st
       return null
     }
 
-    const [myQuotations, totalSpent, recentQuotations, paymentCount, receiptCount, company] = await Promise.all([
+    const [myQuotations, openQuotations, totalQuoted, totalPaid, recentQuotations, paymentCount, receiptCount, company] = await Promise.all([
       prisma.quotation.count({
         where: { customerId: customer.id },
+      }),
+      prisma.quotation.count({
+        where: {
+          customerId: customer.id,
+          paymentStatus: { not: "COMPLETED" },
+          status: { in: ["SENT", "VIEWED", "APPROVED"] },
+        },
       }),
       prisma.quotation.aggregate({
         where: { customerId: customer.id },
         _sum: { total: true },
+      }),
+      prisma.payment.aggregate({
+        where: {
+          customerId: customer.id,
+          status: { in: ["PARTIAL", "COMPLETED"] },
+        },
+        _sum: { amount: true },
       }),
       prisma.quotation.findMany({
         where: {
@@ -143,7 +157,9 @@ async function getDashboardData(userId: string, userRole: string, companyId?: st
 
     return {
       myQuotations,
-      totalSpent: totalSpent._sum.total || 0,
+      openQuotations,
+      totalSpent: totalPaid._sum.amount || 0,
+      outstanding: Math.max(0, Number(totalQuoted._sum.total || 0) - Number(totalPaid._sum.amount || 0)),
       recentQuotations,
       paymentCount,
       receiptCount,
@@ -334,7 +350,7 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">My Quotations</CardTitle>
@@ -344,10 +360,19 @@ export default async function DashboardPage() {
             <div className="text-2xl font-bold">{customerData.myQuotations}</div>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Open</CardTitle>
+            <FileText className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{customerData.openQuotations}</div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Spent</CardTitle>
+            <CardTitle className="text-sm font-medium">Paid</CardTitle>
             <CreditCard className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
@@ -356,11 +381,11 @@ export default async function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Payments</CardTitle>
-            <CreditCard className="h-4 w-4 text-foreground" />
+            <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
+            <CreditCard className="h-4 w-4 text-amber-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{customerData.paymentCount}</div>
+            <div className="text-2xl font-bold">{formatCurrency(customerData.outstanding)}</div>
           </CardContent>
         </Card>
         <Card>
@@ -370,6 +395,7 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{customerData.receiptCount}</div>
+            <p className="mt-1 text-xs text-muted-foreground">{customerData.paymentCount} payments</p>
           </CardContent>
         </Card>
       </div>
@@ -381,7 +407,10 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {customerData.recentQuotations.map((quotation: any) => (
+              {customerData.recentQuotations.map((quotation: any) => {
+                const isPaid = quotation.paymentStatus === "COMPLETED" || quotation.status === "COMPLETED"
+                const actionText = isPaid ? "View receipt" : quotation.status === "APPROVED" ? "Pay now" : quotation.status === "REJECTED" ? "View" : "Review"
+                return (
                 <div key={quotation.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
                   <div>
                     <Link href={`/dashboard/quotations/${quotation.id}`} className="font-medium text-sm underline-offset-4 hover:underline">{quotation.quotationNumber}</Link>
@@ -392,9 +421,12 @@ export default async function DashboardPage() {
                       {quotation.status}
                     </Badge>
                     <p className="font-medium text-sm">{formatCurrency(quotation.total)}</p>
+                    <Link href={`/dashboard/quotations/${quotation.id}`} className="rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-accent">
+                      {actionText}
+                    </Link>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           </CardContent>
         </Card>
