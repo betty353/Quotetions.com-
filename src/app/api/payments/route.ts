@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { createPaymentSchema } from "@/lib/schemas"
 import requireRole from "@/lib/roles"
 import { ZodError } from "zod"
-import { createActivityLog, createAuditLog, syncQuotationPaymentState } from "@/lib/finance"
+import { createActivityLog, createAuditLog, finalizeConfirmedPayment } from "@/lib/finance"
 
 export async function GET(request: NextRequest) {
   const session = await requireRole("ADMIN", "EMPLOYEE", "CUSTOMER")
@@ -102,7 +102,6 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    await syncQuotationPaymentState(quotation.id)
     await prisma.quotation.update({
       where: { id: quotation.id },
       data: {
@@ -125,6 +124,12 @@ export async function POST(request: NextRequest) {
       },
       quotationId: quotation.id,
       paymentId: payment.id,
+    })
+    const finalized = await finalizeConfirmedPayment({
+      paymentId: payment.id,
+      quotationId: quotation.id,
+      actorUserId: session.user.id,
+      receiptNotes: "Receipt generated automatically after staff-confirmed payment",
     })
     await createAuditLog({
       companyId,
@@ -153,7 +158,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ data: payment }, { status: 201 })
+    return NextResponse.json({ data: payment, receipt: finalized.receipt, stockMovements: finalized.movements }, { status: 201 })
   } catch (err: unknown) {
     if (err instanceof ZodError) {
       return NextResponse.json({ error: "Validation failed", details: err.errors }, { status: 400 })

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { getDpoCredentials, isDpoPaymentSuccessful, verifyDpoToken, type DpoVerifyResult } from "@/lib/dpo"
-import type { Prisma } from "@prisma/client"
+import { finalizeConfirmedPayment } from "@/lib/finance"
 
 export const DPO_SETTLEMENT_NOTE =
   "DPO processes the real money and settles funds to your registered merchant bank/mobile money account. This system only records and verifies payment status."
@@ -14,23 +14,6 @@ function toPaymentMethod(value?: string | null) {
   if (normalized.includes("card") || normalized.includes("visa") || normalized.includes("mastercard")) return "CARD"
   if (normalized.includes("bank")) return "BANK_TRANSFER"
   return "OTHER"
-}
-
-async function generateReceiptNumber(tx: Prisma.TransactionClient, prefix = "RCT") {
-  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "")
-  const dayStart = new Date()
-  dayStart.setHours(0, 0, 0, 0)
-  const dayEnd = new Date(dayStart)
-  dayEnd.setDate(dayEnd.getDate() + 1)
-  const count = await tx.receipt.count({
-    where: {
-      createdAt: {
-        gte: dayStart,
-        lt: dayEnd,
-      },
-    },
-  })
-  return `${prefix}-${datePart}-${String(count + 1).padStart(6, "0")}`
 }
 
 export async function verifyAndRecordDpoPayment(transactionToken: string) {
@@ -104,17 +87,6 @@ export async function verifyAndRecordDpoPayment(transactionToken: string) {
       return { payment: failedPayment, quotation: failedQuotation, receipt: null }
     }
 
-    const existingReceipt = await tx.receipt.findFirst({
-      where: {
-        OR: [
-          { paymentId: payment.id },
-          { receiptNumber: payment.receiptNumber || undefined },
-        ],
-      },
-    })
-
-    const receiptNumber = existingReceipt?.receiptNumber || await generateReceiptNumber(tx, setting.receiptPrefix || "RCT")
-
     const paidPayment = await tx.payment.update({
       where: { id: payment.id },
       data: {
@@ -122,7 +94,6 @@ export async function verifyAndRecordDpoPayment(transactionToken: string) {
         method: paymentMethod,
         reference,
         notes: result.resultExplanation || "DPO payment verified",
-        receiptNumber,
         paymentDate: new Date(),
       },
     })
@@ -136,36 +107,26 @@ export async function verifyAndRecordDpoPayment(transactionToken: string) {
         paymentMethod,
         paymentReference: reference,
         paidAt: new Date(),
-        receiptNumber,
         settlementNote: DPO_SETTLEMENT_NOTE,
       },
     })
 
-    const receipt = existingReceipt || await tx.receipt.create({
-      data: {
-        companyId,
-        receiptNumber,
-        quotationId: payment.quotationId,
-        customerId: payment.customerId,
-        generatedById: payment.recordedById,
-        paymentId: payment.id,
-        amount: payment.amount,
-        currency: payment.currency,
-        paymentMethod,
-        reference,
-        notes: "DPO payment verified and receipt generated",
-        provider: "DPO",
-        signatureImageUrl: setting.signatureImageUrl || null,
-      },
-    })
-
-    return { payment: paidPayment, quotation: paidQuotation, receipt }
+    return { payment: paidPayment, quotation: paidQuotation, receipt: null }
   })
+
+  const finalized = paid ? await finalizeConfirmedPayment({
+    paymentId: updated.payment.id,
+    quotationId: updated.quotation.id,
+    actorUserId: updated.payment.recordedById,
+    receiptNotes: "DPO payment verified and receipt generated automatically",
+  }) : { receipt: null, movements: [] }
 
   return {
     paid,
     result,
     ...updated,
+    receipt: finalized.receipt,
+    stockMovements: finalized.movements,
   }
 }
 

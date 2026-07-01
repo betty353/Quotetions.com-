@@ -191,7 +191,7 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
             <Card>
               <CardHeader>
                 <CardTitle>Payments</CardTitle>
-                <CardDescription>Pay online through DPO or record staff-confirmed payments.</CardDescription>
+                <CardDescription>Pay online through DPO or record staff-confirmed payments. Receipts are generated automatically for confirmed payments.</CardDescription>
               </CardHeader>
               <CardContent>
                 {!isPaid && (
@@ -240,7 +240,8 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
                     <table className="min-w-full text-left text-sm">
                       <thead className="border-b border-slate-200 text-slate-500">
                         <tr>
-                          <th className="px-4 py-3">Receipt#</th>
+                          <th className="px-4 py-3">Payment #</th>
+                          <th className="px-4 py-3">Receipt #</th>
                           <th className="px-4 py-3">Amount</th>
                           <th className="px-4 py-3">Provider</th>
                           <th className="px-4 py-3">Reference</th>
@@ -253,6 +254,7 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
                         {quotation.payments.map((payment) => (
                           <tr key={payment.id} className="border-b border-slate-100 hover:bg-slate-50">
                             <td className="px-4 py-3">{payment.paymentNumber}</td>
+                            <td className="px-4 py-3">{payment.receiptNumber || "-"}</td>
                             <td className="px-4 py-3">{formatCurrency(payment.amount)}</td>
                             <td className="px-4 py-3">{payment.provider}</td>
                             <td className="px-4 py-3">{payment.reference || "-"}</td>
@@ -277,7 +279,7 @@ export default async function QuotationDetailPage({ params }: QuotationPageProps
             <Card>
               <CardHeader>
                 <CardTitle>Receipts</CardTitle>
-                <CardDescription>Generate receipts for confirmed payments.</CardDescription>
+                <CardDescription>Confirmed payments now create receipts automatically. Use manual receipt generation only for older payments without receipts.</CardDescription>
               </CardHeader>
               <CardContent>
                 {role !== "CUSTOMER" && (
