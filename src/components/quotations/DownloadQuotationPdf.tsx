@@ -5,6 +5,7 @@ import jsPDF, { GState } from "jspdf"
 interface Props {
   quotationId: string
   documentType?: "quotation" | "invoice"
+  includeHistory?: boolean
 }
 
 type DocumentType = "quotation" | "invoice"
@@ -270,7 +271,7 @@ function normalizeSetting(q: any, fallback: PdfSetting): PdfSetting {
   }
 }
 
-export default function DownloadQuotationPdf({ quotationId, documentType = "quotation" }: Props) {
+export default function DownloadQuotationPdf({ quotationId, documentType = "quotation", includeHistory = false }: Props) {
   async function handleDownload() {
     try {
       const [quotationRes, settingsRes] = await Promise.all([
@@ -477,7 +478,7 @@ export default function DownloadQuotationPdf({ quotationId, documentType = "quot
       doc.setTextColor(100, 116, 139)
       doc.text("Authorized signature", 40, signatureY + 16)
 
-      drawCustomerHistory(doc, setting, logoData, q.customer, currency)
+      if (includeHistory) drawCustomerHistory(doc, setting, logoData, q.customer, currency)
 
       doc.save(`${q.quotationNumber || documentType}-${documentType}.pdf`)
     } catch (err) {

@@ -4,6 +4,7 @@ import jsPDF, { GState } from "jspdf"
 
 interface Props {
   receiptId: string
+  includeHistory?: boolean
 }
 
 type PdfSetting = {
@@ -249,7 +250,7 @@ function normalizeSetting(receipt: any, fallback: PdfSetting): PdfSetting {
   }
 }
 
-export default function DownloadReceiptPdf({ receiptId }: Props) {
+export default function DownloadReceiptPdf({ receiptId, includeHistory = false }: Props) {
   async function handleDownload() {
     try {
       const [receiptRes, settingsRes] = await Promise.all([
@@ -286,59 +287,98 @@ export default function DownloadReceiptPdf({ receiptId }: Props) {
       const pageWidth = doc.internal.pageSize.getWidth()
       const currency = "ZMW"
       const customerName = receipt.customer?.companyName || receipt.customer?.contactPerson || "Customer"
+      const customerAddress = [
+        receipt.customer?.address,
+        receipt.customer?.town || receipt.customer?.city,
+        receipt.customer?.region,
+        receipt.customer?.country,
+      ].filter(Boolean).join(", ")
       const address = companyAddress(setting)
 
-      doc.setFillColor(240, 253, 244)
-      doc.setDrawColor(187, 247, 208)
-      doc.roundedRect(40, 120, pageWidth - 80, 104, 12, 12, "FD")
-      doc.setTextColor(22, 101, 52)
+      doc.setFillColor(236, 253, 245)
+      doc.setDrawColor(16, 185, 129)
+      doc.roundedRect(40, 116, pageWidth - 80, 112, 12, 12, "FD")
+      doc.setFillColor(16, 185, 129)
+      doc.roundedRect(pageWidth - 168, 138, 108, 36, 18, 18, "F")
+      doc.setTextColor(255, 255, 255)
+      doc.setFont("Helvetica", "bold")
+      doc.setFontSize(12)
+      doc.text("PAID", pageWidth - 114, 161, { align: "center" })
+
+      doc.setTextColor(6, 95, 70)
       doc.setFont("Helvetica", "bold")
       doc.setFontSize(11)
-      doc.text("PAYMENT RECEIVED", 60, 148)
-      doc.setFontSize(30)
+      doc.text("PAYMENT RECEIVED", 60, 146)
+      doc.setFontSize(32)
       doc.text(money(receipt.amount, currency), 60, 188)
+      doc.setFont("Helvetica", "normal")
       doc.setFontSize(10)
       doc.setTextColor(21, 128, 61)
-      doc.text(`Paid on ${new Date(receipt.createdAt).toLocaleString()}`, 60, 208)
+      doc.text(`Received on ${new Date(receipt.createdAt).toLocaleString()}`, 60, 210)
 
-      doc.setFillColor(22, 101, 52)
-      doc.roundedRect(pageWidth - 165, 148, 105, 32, 16, 16, "F")
+      doc.setFillColor(255, 255, 255)
+      doc.setDrawColor(209, 250, 229)
+      doc.roundedRect(40, 252, pageWidth - 80, 146, 10, 10, "FD")
+      doc.setFillColor(6, 95, 70)
+      doc.rect(40, 252, pageWidth - 80, 28, "F")
       doc.setTextColor(255, 255, 255)
-      doc.setFontSize(12)
-      doc.text("PAID", pageWidth - 112, 169, { align: "center" })
+      doc.setFont("Helvetica", "bold")
+      doc.setFontSize(10)
+      doc.text("PAYMENT DETAILS", 60, 271)
 
-      drawDetailRow(doc, "Receipt number", clean(receipt.receiptNumber), 40, 250, 245)
-      drawDetailRow(doc, "Quotation", clean(receipt.quotation?.quotationNumber), 310, 250, 245)
-      drawDetailRow(doc, "Customer", customerName, 40, 306, 245)
-      drawDetailRow(doc, "Payment method", clean(receipt.paymentMethod), 310, 306, 245)
-      drawDetailRow(doc, "Provider", clean(receipt.provider || "MANUAL"), 40, 362, 245)
-      drawDetailRow(doc, "Reference", clean(receipt.reference), 310, 362, 245)
+      const detailRows = [
+        ["Receipt Number", clean(receipt.receiptNumber), "Quotation", clean(receipt.quotation?.quotationNumber)],
+        ["Payment Method", clean(receipt.paymentMethod), "Provider", clean(receipt.provider || "MANUAL")],
+        ["Reference", clean(receipt.reference), "Status", "Recorded"],
+      ]
+      let detailY = 306
+      detailRows.forEach(([leftLabel, leftValue, rightLabel, rightValue]) => {
+        doc.setFont("Helvetica", "bold")
+        doc.setFontSize(8)
+        doc.setTextColor(100, 116, 139)
+        doc.text(leftLabel.toUpperCase(), 60, detailY)
+        doc.text(rightLabel.toUpperCase(), 320, detailY)
+        doc.setFont("Helvetica", "normal")
+        doc.setFontSize(10)
+        doc.setTextColor(17, 24, 39)
+        doc.text(doc.splitTextToSize(leftValue, 210), 60, detailY + 16)
+        doc.text(doc.splitTextToSize(rightValue, 210), 320, detailY + 16)
+        detailY += 38
+      })
 
       doc.setFillColor(255, 255, 255)
       doc.setDrawColor(226, 232, 240)
-      doc.roundedRect(40, 438, pageWidth - 80, 118, 10, 10, "FD")
+      doc.roundedRect(40, 426, pageWidth - 80, 132, 10, 10, "FD")
       doc.setTextColor(17, 24, 39)
       doc.setFont("Helvetica", "bold")
       doc.setFontSize(11)
-      doc.text("Company details", 60, 466)
+      doc.text("Received from", 60, 454)
+      doc.text("Received by", 330, 454)
       doc.setFont("Helvetica", "normal")
       doc.setFontSize(9)
       doc.setTextColor(71, 85, 105)
+      const customerLines = [
+        customerName,
+        customerAddress,
+        receipt.customer?.phone ? `Phone: ${receipt.customer.phone}` : "",
+        receipt.customer?.nrc ? `NRC: ${receipt.customer.nrc}` : "",
+      ].filter(Boolean)
+      doc.text(customerLines, 60, 474)
       const companyLines = [
         clean(setting.companyName, "Company"),
         address,
         setting.companyTaxId ? `Tax ID: ${setting.companyTaxId}` : "",
         setting.companyRegistration ? `Registration: ${setting.companyRegistration}` : "",
       ].filter(Boolean)
-      doc.text(companyLines, 60, 486)
+      doc.text(companyLines, 330, 474)
 
       doc.setFont("Helvetica", "bold")
       doc.setTextColor(17, 24, 39)
-      doc.text("Notes", 330, 466)
+      doc.text("Receipt note", 60, 592)
       doc.setFont("Helvetica", "normal")
       doc.setTextColor(71, 85, 105)
-      const notes = doc.splitTextToSize(clean(receipt.notes, "Payment has been received and recorded."), 205)
-      doc.text(notes, 330, 486)
+      const notes = doc.splitTextToSize(clean(receipt.notes, "This receipt confirms that the payment above was received and recorded for the referenced quotation."), pageWidth - 120)
+      doc.text(notes, 60, 612)
 
       const signatureY = 650
       const signatureImageUrl = setting.signatureImageUrl
@@ -369,7 +409,7 @@ export default function DownloadReceiptPdf({ receiptId }: Props) {
       doc.setFontSize(9)
       doc.text("This receipt confirms that the payment above was recorded for the referenced quotation.", 60, 730)
 
-      drawCustomerHistory(doc, setting, logoData, receipt.customer, currency)
+      if (includeHistory) drawCustomerHistory(doc, setting, logoData, receipt.customer, currency)
 
       doc.save(`${receipt.receiptNumber || "receipt"}.pdf`)
     } catch (err) {
@@ -380,7 +420,7 @@ export default function DownloadReceiptPdf({ receiptId }: Props) {
 
   return (
     <button onClick={handleDownload} className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium transition-colors hover:bg-slate-200">
-      Download PDF
+      Download Receipt
     </button>
   )
 }
