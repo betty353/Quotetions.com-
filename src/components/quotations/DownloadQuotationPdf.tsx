@@ -158,10 +158,10 @@ function drawShell(doc: jsPDF, setting: PdfSetting, logoData: string | null, tit
   doc.setFont("Helvetica", "bold")
   doc.setFontSize(isInvoice ? 28 : 32)
   doc.setTextColor(isInvoice ? 20 : 17, isInvoice ? 84 : 24, isInvoice ? 180 : 39)
-  doc.text(title, isInvoice ? pageWidth - 40 : 40, isInvoice ? 136 : 74, { align: isInvoice ? "right" : "left" })
+  doc.text(title, isInvoice ? pageWidth - 40 : 40, isInvoice ? 136 : 132, { align: isInvoice ? "right" : "left" })
   doc.setFontSize(10)
   doc.setTextColor(isInvoice ? 37 : 71, isInvoice ? 99 : 85, isInvoice ? 235 : 105)
-  doc.text(number, isInvoice ? pageWidth - 40 : 42, isInvoice ? 154 : 94, { align: isInvoice ? "right" : "left" })
+  doc.text(number, isInvoice ? pageWidth - 40 : 42, isInvoice ? 154 : 150, { align: isInvoice ? "right" : "left" })
 
   doc.setFont("Helvetica", "normal")
   doc.setFontSize(8)
@@ -323,14 +323,14 @@ export default function DownloadQuotationPdf({ quotationId, documentType = "quot
         q.customer?.email || q.customer?.user?.email || "",
         q.customer?.phone ? `Phone: ${q.customer.phone}` : "",
         q.customer?.nrc ? `NRC: ${q.customer.nrc}` : "",
-      ], 40, isInvoice ? 170 : 126, 245, 112)
+      ], 40, isInvoice ? 170 : 172, 245, 112)
 
       drawInfoBox(doc, `${isInvoice ? "Invoice" : "Quotation"} details`, [
         documentNumberLabel,
         `Date: ${new Date(q.createdAt).toLocaleDateString()}`,
         isInvoice ? `Due date: ${q.validUntil ? new Date(q.validUntil).toLocaleDateString() : "On receipt"}` : `Valid until: ${q.validUntil ? new Date(q.validUntil).toLocaleDateString() : "Not set"}`,
         `Status: ${q.status || "DRAFT"}`,
-      ], pageWidth - 285, isInvoice ? 170 : 126, 245, 112)
+      ], pageWidth - 285, isInvoice ? 170 : 172, 245, 112)
 
       const address = companyAddress(setting)
       if (!isInvoice && (address || setting.companyTaxId || setting.companyRegistration)) {
@@ -338,10 +338,10 @@ export default function DownloadQuotationPdf({ quotationId, documentType = "quot
           address,
           setting.companyTaxId ? `Tax ID: ${setting.companyTaxId}` : "",
           setting.companyRegistration ? `Registration: ${setting.companyRegistration}` : "",
-        ], 40, 248, pageWidth - 80, 62)
+        ], 40, 300, pageWidth - 80, 62)
       }
 
-      let y = isInvoice ? 322 : 340
+      let y = isInvoice ? 322 : 386
       const tableX = 40
       const columns = [
         { label: "Item Description", x: tableX, width: 230 },
@@ -378,7 +378,7 @@ export default function DownloadQuotationPdf({ quotationId, documentType = "quot
         if (y + rowHeight > pageHeight - 160) {
           doc.addPage()
           drawShell(doc, setting, logoData, documentTitle, documentNumberLabel, documentType)
-          y = isInvoice ? 180 : 132
+          y = isInvoice ? 180 : 180
           drawTableHeader()
         }
 
@@ -399,10 +399,10 @@ export default function DownloadQuotationPdf({ quotationId, documentType = "quot
       })
 
       y += 12
-      if (y + 156 > pageHeight - 80) {
+      if (y + (isInvoice ? 156 : 236) > pageHeight - 80) {
         doc.addPage()
         drawShell(doc, setting, logoData, documentTitle, documentNumberLabel, documentType)
-        y = isInvoice ? 180 : 132
+        y = isInvoice ? 180 : 180
       }
 
       const totalX = pageWidth - 280
@@ -447,6 +447,22 @@ export default function DownloadQuotationPdf({ quotationId, documentType = "quot
         doc.text(notes, notesX + (isInvoice ? 0 : 12), y + 38)
       }
 
+      const signatureY = isInvoice ? pageHeight - 116 : pageHeight - 218
+      if (setting.signatureImageUrl) {
+        try {
+          const signatureData = await getBase64ImageFromUrl(setting.signatureImageUrl)
+          drawImageContain(doc, signatureData, 40, signatureY - 44, 150, 44)
+        } catch (error) {
+          console.warn("Could not render signature", error)
+        }
+      }
+      doc.setDrawColor(isInvoice ? 20 : 17, isInvoice ? 84 : 24, isInvoice ? 180 : 39)
+      doc.line(40, signatureY, 210, signatureY)
+      doc.setFont("Helvetica", "normal")
+      doc.setFontSize(9)
+      doc.setTextColor(100, 116, 139)
+      doc.text("Company authorized signature", 40, signatureY + 16)
+
       const acceptanceY = pageHeight - 144
       if (!isInvoice) {
         doc.setDrawColor(150, 150, 150)
@@ -461,22 +477,6 @@ export default function DownloadQuotationPdf({ quotationId, documentType = "quot
         doc.text("Name:", 255, acceptanceY + 48)
         doc.text("Date:", 438, acceptanceY + 48)
       }
-
-      const signatureY = isInvoice ? pageHeight - 116 : pageHeight - 72
-      if (setting.signatureImageUrl) {
-        try {
-          const signatureData = await getBase64ImageFromUrl(setting.signatureImageUrl)
-          drawImageContain(doc, signatureData, 40, signatureY - 42, 130, 42)
-        } catch (error) {
-          console.warn("Could not render signature", error)
-        }
-      }
-      doc.setDrawColor(isInvoice ? 20 : 17, isInvoice ? 84 : 24, isInvoice ? 180 : 39)
-      doc.line(40, signatureY, 190, signatureY)
-      doc.setFont("Helvetica", "normal")
-      doc.setFontSize(9)
-      doc.setTextColor(100, 116, 139)
-      doc.text("Authorized signature", 40, signatureY + 16)
 
       if (includeHistory) drawCustomerHistory(doc, setting, logoData, q.customer, currency)
 
